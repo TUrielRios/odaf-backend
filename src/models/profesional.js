@@ -61,6 +61,21 @@ module.exports = (sequelize, DataTypes) => {
       observaciones: {
         type: DataTypes.TEXT,
       },
+      porcentaje_comision: {
+        type: DataTypes.DECIMAL(5, 2),
+        allowNull: false,
+        defaultValue: 50.0,
+        validate: {
+          min: 0,
+          max: 100,
+        },
+        comment: "Porcentaje de comisión que recibe el profesional por defecto (0-100)",
+      },
+      color: {
+        type: DataTypes.STRING,
+        defaultValue: "#026498",
+        comment: "Color identificativo del profesional en el calendario",
+      },
     },
     {
       tableName: "profesionales",
@@ -97,6 +112,23 @@ module.exports = (sequelize, DataTypes) => {
     Profesional.hasMany(models.Archivo, {
       foreignKey: "profesional_id",
       as: "archivos",
+    })
+
+    Profesional.hasMany(models.Prestacion, {
+      foreignKey: "profesional_id",
+      as: "prestaciones",
+    })
+
+    Profesional.belongsToMany(models.Servicio, {
+      through: models.ProfesionalServicio,
+      foreignKey: "profesional_id",
+      otherKey: "servicio_id",
+      as: "servicios",
+    })
+
+    Profesional.hasMany(models.ProfesionalServicio, {
+      foreignKey: "profesional_id",
+      as: "profesionalServicios",
     })
   }
 

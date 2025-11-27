@@ -23,6 +23,15 @@ module.exports = (sequelize, DataTypes) => {
           key: "id",
         },
       },
+      observaciones: {
+        type: DataTypes.TEXT,
+        allowNull: true,
+      },
+      pago_confirmado: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
       servicio_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
@@ -97,6 +106,11 @@ module.exports = (sequelize, DataTypes) => {
     Turno.belongsTo(models.SubServicio, {
       foreignKey: "subservicio_id",
       as: "subservicio",
+    })
+
+    Turno.hasMany(models.Prestacion, {
+      foreignKey: "turno_id",
+      as: "prestaciones",
     })
   }
 

@@ -6,6 +6,7 @@ const {
   obtenerPaciente,
   actualizarPaciente,
   eliminarPaciente,
+  buscarPorDocumento,
 } = require("../controllers/pacienteController")
 const auth = require("../middlewares/auth")
 
@@ -22,11 +23,13 @@ const pacienteValidation = [
 ]
 
 // Aplicar autenticación a todas las rutas
-router.use(auth)
+// router.use(auth)
 
 // Rutas
 router.get("/", listarPacientes)
 router.post("/", pacienteValidation, crearPaciente)
+// IMPORTANTE: Esta ruta debe estar ANTES de /:id para que no capture "documento" como un ID
+router.get("/documento/:numero_documento", buscarPorDocumento)
 router.get("/:id", obtenerPaciente)
 router.put("/:id", pacienteValidation, actualizarPaciente)
 router.delete("/:id", eliminarPaciente)

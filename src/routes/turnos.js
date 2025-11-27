@@ -13,8 +13,9 @@ const validacionCrearTurno = [
   body("paciente_id").notEmpty().withMessage("El ID del paciente es requerido"),
   body("profesional_id").isInt().withMessage("El ID del profesional debe ser un número entero"),
   body("servicio_id").isInt().withMessage("El ID del servicio debe ser un número entero"),
-  body("fecha_hora").isISO8601().withMessage("La fecha y hora deben ser válidas"),
-  body("duracion_minutos").isInt({ min: 15, max: 480 }).withMessage("La duración debe estar entre 15 y 480 minutos"),
+  body("fecha").isDate().withMessage("La fecha debe ser válida (YYYY-MM-DD)"),
+  body("hora_inicio").matches(/^([01]\d|2[0-3]):([0-5]\d)$/).withMessage("La hora de inicio debe tener formato HH:MM"),
+  body("hora_fin").matches(/^([01]\d|2[0-3]):([0-5]\d)$/).withMessage("La hora de fin debe tener formato HH:MM"),
 ]
 
 const validacionActualizarTurno = [
@@ -34,6 +35,7 @@ router.get("/", turnoController.listarTurnos)
 router.post("/", validacionCrearTurno, turnoController.crearTurno)
 router.get("/:id", turnoController.obtenerTurno)
 router.put("/:id", validacionActualizarTurno, turnoController.actualizarTurno)
+router.put("/:id/confirmar-pago", turnoController.confirmarPago)
 router.delete("/:id", turnoController.eliminarTurno)
 router.get("/disponibilidad/:profesional_id", turnoController.verificarDisponibilidad)
 

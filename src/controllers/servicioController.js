@@ -1,4 +1,4 @@
-const { Servicio, SubServicio } = require("../models")
+const { Servicio, SubServicio, Profesional, ProfesionalServicio } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
 
@@ -233,6 +233,39 @@ const obtenerSubservicios = async (req, res) => {
   }
 }
 
+const obtenerProfesionalesServicio = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const servicio = await Servicio.findByPk(id, {
+      include: [
+        {
+          model: Profesional,
+          as: "profesionales",
+          through: {
+            attributes: ["estado", "createdAt"],
+            where: { estado: "Activo" },
+          },
+          attributes: ["id", "nombre", "apellido", "especialidad", "telefono", "email"],
+        },
+      ],
+    })
+
+    if (!servicio) {
+      return res.status(404).json({ error: "Servicio no encontrado" })
+    }
+
+    res.json({
+      servicio_id: Number.parseInt(id),
+      nombre: servicio.nombre,
+      profesionales: servicio.profesionales,
+    })
+  } catch (error) {
+    console.error("Error al obtener profesionales del servicio:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+}
+
 module.exports = {
   listarServicios,
   crearServicio,
@@ -243,4 +276,5 @@ module.exports = {
   crearSubServicio,
   actualizarSubServicio,
   eliminarSubServicio,
+  obtenerProfesionalesServicio,
 }

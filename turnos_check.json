@@ -1,0 +1,76 @@
+{
+  "turnos": [
+    {
+      "id": 1,
+      "paciente_id": "c9c9781d-f5b4-429d-9d59-4832af765fc6",
+      "profesional_id": 1,
+      "servicio_id": 1,
+      "subservicio_id": null,
+      "fecha": "2025-11-28",
+      "hora_inicio": "11:30:00",
+      "hora_fin": "12:00:00",
+      "estado": "Pendiente",
+      "notas": null,
+      "recordatorio_enviado": false,
+      "createdAt": "2025-11-26T00:44:38.433Z",
+      "updatedAt": "2025-11-26T00:44:38.433Z",
+      "paciente": {
+        "id": "c9c9781d-f5b4-429d-9d59-4832af765fc6",
+        "nombre": "Tiziano",
+        "apellido": "Ruiz",
+        "numero_documento": "45326948"
+      },
+      "profesional": {
+        "id": 1,
+        "nombre": "Pepe",
+        "apellido": "Quica",
+        "especialidad": "Odontología general"
+      },
+      "servicio": {
+        "id": 1,
+        "nombre": "Limpieza dental",
+        "precio_base": "10000.00"
+      },
+      "subservicio": null
+    },
+    {
+      "id": 2,
+      "paciente_id": "fdb956d7-1516-4c2b-8a09-eeaa9f570f44",
+      "profesional_id": 1,
+      "servicio_id": 1,
+      "subservicio_id": null,
+      "fecha": "2025-11-28",
+      "hora_inicio": "13:00:00",
+      "hora_fin": "13:30:00",
+      "estado": "Pendiente",
+      "notas": null,
+      "recordatorio_enviado": false,
+      "createdAt": "2025-11-26T21:53:56.859Z",
+      "updatedAt": "2025-11-26T21:53:56.859Z",
+      "paciente": {
+        "id": "fdb956d7-1516-4c2b-8a09-eeaa9f570f44",
+        "nombre": "Martin",
+        "apellido": "Saralegui",
+        "numero_documento": "40235978"
+      },
+      "profesional": {
+        "id": 1,
+        "nombre": "Pepe",
+        "apellido": "Quica",
+        "especialidad": "Odontología general"
+      },
+      "servicio": {
+        "id": 1,
+        "nombre": "Limpieza dental",
+        "precio_base": "10000.00"
+      },
+      "subservicio": null
+    }
+  ],
+  "pagination": {
+    "total": 2,
+    "page": 1,
+    "limit": 10,
+    "totalPages": 1
+  }
+}

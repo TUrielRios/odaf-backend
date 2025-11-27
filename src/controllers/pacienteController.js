@@ -36,6 +36,32 @@ const listarPacientes = async (req, res) => {
           model: ObraSocial,
           as: "obraSocial",
         },
+        {
+          model: Odontograma,
+          as: "odontogramas",
+        },
+        {
+          model: HistorialClinico,
+          as: "historialClinico",
+        },
+        {
+          model: Prescripcion,
+          as: "prescripciones",
+        },
+        {
+          model: PlanTratamiento,
+          as: "planesTratamiento",
+          include: [
+            {
+              model: ObraSocial,
+              as: "obraSocial",
+            },
+          ],
+        },
+        {
+          model: Archivo,
+          as: "archivos",
+        },
       ],
       limit: Number.parseInt(limit),
       offset: Number.parseInt(offset),
@@ -201,10 +227,36 @@ const eliminarPaciente = async (req, res) => {
   }
 }
 
+const buscarPorDocumento = async (req, res) => {
+  try {
+    const { numero_documento } = req.params
+
+    const paciente = await Paciente.findOne({
+      where: { numero_documento },
+      include: [
+        {
+          model: ObraSocial,
+          as: "obraSocial",
+        },
+      ],
+    })
+
+    if (!paciente) {
+      return res.status(404).json({ error: "Paciente no encontrado" })
+    }
+
+    res.json(paciente)
+  } catch (error) {
+    console.error("Error al buscar paciente por documento:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+}
+
 module.exports = {
   listarPacientes,
   crearPaciente,
   obtenerPaciente,
   actualizarPaciente,
   eliminarPaciente,
+  buscarPorDocumento,
 }

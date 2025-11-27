@@ -16,6 +16,8 @@ const historialClinicoRoutes = require("./routes/historiales-clinicos")
 const prescripcionRoutes = require("./routes/prescripciones")
 const planTratamientoRoutes = require("./routes/planes-tratamiento")
 const archivoRoutes = require("./routes/archivos")
+const prestacionRoutes = require("./routes/prestaciones")
+const liquidacionRoutes = require("./routes/liquidaciones")
 
 const app = express()
 
@@ -28,11 +30,10 @@ app.use(
 // Middlewares de seguridad
 app.use(helmet())
 
-
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // máximo 100 requests por ventana de tiempo
+  max: 1000, // máximo 1000 requests por ventana de tiempo
 })
 app.use("/api/", limiter)
 
@@ -55,6 +56,10 @@ app.use("/api/historiales-clinicos", historialClinicoRoutes)
 app.use("/api/prescripciones", prescripcionRoutes)
 app.use("/api/planes-tratamiento", planTratamientoRoutes)
 app.use("/api/archivos", archivoRoutes)
+app.use("/api/prestaciones", prestacionRoutes)
+app.use("/api/liquidaciones", liquidacionRoutes)
+app.use("/api/obras-sociales", require("./routes/obras-sociales"))
+app.use("/api/copagos", require("./routes/copagos"))
 
 // Ruta de salud
 app.get("/health", (req, res) => {
@@ -71,7 +76,7 @@ app.use((error, req, res, next) => {
   console.error("Error:", error)
   res.status(error.status || 500).json({
     error: error.message || "Error interno del servidor",
-    ...(process.env.NODE_ENV === "development" && { stack: error.stack }),
+    stack: error.stack, // Removed the conditional check for NODE_ENV
   })
 })
 

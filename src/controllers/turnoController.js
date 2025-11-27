@@ -1,4 +1,4 @@
-const { Turno, Paciente, Profesional, Servicio, SubServicio } = require("../models")
+const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
 
@@ -46,7 +46,7 @@ const listarTurnos = async (req, res) => {
         {
           model: Profesional,
           as: "profesional",
-          attributes: ["id", "nombre", "apellido", "especialidad"],
+          attributes: ["id", "nombre", "apellido", "especialidad", "color"],
         },
         {
           model: Servicio,
@@ -89,6 +89,22 @@ const crearTurno = async (req, res) => {
       return res.status(400).json({ errors: errors.array() })
     }
 
+    if (req.body.servicio_id && req.body.profesional_id) {
+      const relacionServicio = await ProfesionalServicio.findOne({
+        where: {
+          profesional_id: req.body.profesional_id,
+          servicio_id: req.body.servicio_id,
+          estado: "Activo",
+        },
+      })
+
+      if (!relacionServicio) {
+        return res.status(400).json({
+          error: "El profesional seleccionado no está disponible para este servicio",
+        })
+      }
+    }
+
     // Verificar disponibilidad del profesional
     const turnoExistente = await Turno.findOne({
       where: {
@@ -122,6 +138,28 @@ const crearTurno = async (req, res) => {
       })
     }
 
+    // Verificar restricción mensual: Un turno por mes por servicio para el paciente
+    const fechaTurno = new Date(req.body.fecha)
+    const primerDiaMes = new Date(fechaTurno.getFullYear(), fechaTurno.getMonth(), 1)
+    const ultimoDiaMes = new Date(fechaTurno.getFullYear(), fechaTurno.getMonth() + 1, 0)
+
+    const turnoMensualExistente = await Turno.findOne({
+      where: {
+        paciente_id: req.body.paciente_id,
+        servicio_id: req.body.servicio_id,
+        fecha: {
+          [Op.between]: [primerDiaMes, ultimoDiaMes],
+        },
+        estado: { [Op.ne]: "Cancelado" },
+      },
+    })
+
+    if (turnoMensualExistente) {
+      return res.status(400).json({
+        error: "Ya posee un turno reservado para esta prestación en este mes.",
+      })
+    }
+
     const turno = await Turno.create(req.body)
 
     const turnoCompleto = await Turno.findByPk(turno.id, {
@@ -134,7 +172,7 @@ const crearTurno = async (req, res) => {
         {
           model: Profesional,
           as: "profesional",
-          attributes: ["id", "nombre", "apellido", "especialidad"],
+          attributes: ["id", "nombre", "apellido", "especialidad", "color"],
         },
         {
           model: Servicio,
@@ -169,6 +207,7 @@ const obtenerTurno = async (req, res) => {
         {
           model: Profesional,
           as: "profesional",
+          attributes: ["id", "nombre", "apellido", "especialidad", "color"],
         },
         {
           model: Servicio,
@@ -303,6 +342,66 @@ const verificarDisponibilidad = async (req, res) => {
   }
 }
 
+const confirmarPago = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { confirmar } = req.body // true = confirm, false = reject
+
+    const turno = await Turno.findByPk(id)
+    if (!turno) {
+      return res.status(404).json({ error: "Turno no encontrado" })
+    }
+
+    if (confirmar) {
+      // Confirm payment
+      await Turno.update(
+        {
+          pago_confirmado: true,
+          estado: "Confirmado"
+        },
+        { where: { id } }
+      )
+    } else {
+      // Reject payment
+      await Turno.update(
+        {
+          pago_confirmado: false,
+          estado: "Cancelado"
+        },
+        { where: { id } }
+      )
+    }
+
+    const turnoActualizado = await Turno.findByPk(id, {
+      include: [
+        {
+          model: Paciente,
+          as: "paciente",
+          attributes: ["id", "nombre", "apellido", "numero_documento"],
+        },
+        {
+          model: Profesional,
+          as: "profesional",
+          attributes: ["id", "nombre", "apellido", "especialidad", "color"],
+        },
+        {
+          model: Servicio,
+          as: "servicio",
+          attributes: ["id", "nombre", "precio_base"],
+        },
+      ],
+    })
+
+    res.json({
+      message: confirmar ? "Pago confirmado" : "Pago rechazado",
+      turno: turnoActualizado
+    })
+  } catch (error) {
+    console.error("Error al confirmar pago:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+}
+
 module.exports = {
   listarTurnos,
   crearTurno,
@@ -310,4 +409,5 @@ module.exports = {
   actualizarTurno,
   eliminarTurno,
   verificarDisponibilidad,
+  confirmarPago,
 }
