@@ -4,7 +4,7 @@ const { Op } = require("sequelize")
 
 const listarProfesionales = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = "", estado = "" } = req.query
+    const { page = 1, limit = 10, search = "", estado = "Activo" } = req.query
     const offset = (page - 1) * limit
 
     const whereClause = {}
@@ -18,6 +18,7 @@ const listarProfesionales = async (req, res) => {
       ]
     }
 
+    // Si se especifica un estado, filtrar por él (puede ser vacío para mostrar todos)
     if (estado) {
       whereClause.estado = estado
     }
@@ -122,20 +123,31 @@ const eliminarProfesional = async (req, res) => {
   try {
     const { id } = req.params
 
-    const deletedRowsCount = await Profesional.destroy({
-      where: { id },
-    })
+    // Buscar el profesional
+    const profesional = await Profesional.findByPk(id)
 
-    if (deletedRowsCount === 0) {
+    if (!profesional) {
       return res.status(404).json({ error: "Profesional no encontrado" })
     }
 
-    res.json({ message: "Profesional eliminado correctamente" })
+    // En lugar de eliminar, marcar como Inactivo (soft delete)
+    await profesional.update({ estado: "Inactivo" })
+
+    res.json({
+      message: "Profesional marcado como inactivo correctamente",
+      profesional: {
+        id: profesional.id,
+        nombre: profesional.nombre,
+        apellido: profesional.apellido,
+        estado: profesional.estado
+      }
+    })
   } catch (error) {
     console.error("Error al eliminar profesional:", error)
     res.status(500).json({ error: "Error interno del servidor" })
   }
 }
+
 
 const obtenerHorariosProfesional = async (req, res) => {
   try {

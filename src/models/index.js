@@ -26,6 +26,9 @@ const Turno = require("./turno")(sequelize, Sequelize.DataTypes)
 const ConfiguracionSistema = require("./configuracionSistema")(sequelize, Sequelize.DataTypes)
 const Prestacion = require("./prestacion")(sequelize, Sequelize.DataTypes)
 const Liquidacion = require("./liquidacion")(sequelize, Sequelize.DataTypes)
+const Copago = require("./copago")(sequelize, Sequelize.DataTypes)
+const MovimientoCuenta = require("./movimientoCuenta")(sequelize, Sequelize.DataTypes)
+
 
 // Definir asociaciones
 const models = {
@@ -43,7 +46,9 @@ const models = {
   Turno,
   ConfiguracionSistema,
   Prestacion,
-  Liquidacion, // Agregando Liquidacion al objeto models
+  Liquidacion,
+  Copago,
+  MovimientoCuenta,
 }
 
 console.log("[v0] Configurando asociaciones...")

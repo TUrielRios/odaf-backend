@@ -104,7 +104,7 @@ exports.generarLiquidacion = async (req, res) => {
       return res.status(400).json({ errors: errors.array() })
     }
 
-    const { profesional_id, periodo_inicio, periodo_fin, observaciones } = req.body
+    const { profesional_id, periodo_inicio, periodo_fin, observaciones, monto_custom } = req.body
 
     // Verificar que el profesional existe
     const profesional = await Profesional.findByPk(profesional_id)
@@ -139,7 +139,12 @@ exports.generarLiquidacion = async (req, res) => {
 
     // Calcular totales
     const monto_total_servicios = prestaciones.reduce((sum, p) => sum + parseFloat(p.monto_total), 0)
-    const monto_profesional = prestaciones.reduce((sum, p) => sum + parseFloat(p.monto_profesional), 0)
+    let monto_profesional = prestaciones.reduce((sum, p) => sum + parseFloat(p.monto_profesional), 0)
+
+    // Si se proporciona un monto personalizado, usarlo
+    if (monto_custom !== undefined && monto_custom !== null) {
+      monto_profesional = parseFloat(monto_custom)
+    }
 
     // Crear la liquidación
     const liquidacion = await Liquidacion.create({
@@ -334,10 +339,10 @@ exports.obtenerResumenPorProfesional = async (req, res) => {
         liquidacion_id: null,
         ...(fecha_inicio &&
           fecha_fin && {
-            fecha: {
-              [Op.between]: [fecha_inicio, fecha_fin],
-            },
-          }),
+          fecha: {
+            [Op.between]: [fecha_inicio, fecha_fin],
+          },
+        }),
       },
     })
 
@@ -348,5 +353,104 @@ exports.obtenerResumenPorProfesional = async (req, res) => {
   } catch (error) {
     console.error("Error al obtener resumen:", error)
     res.status(500).json({ message: "Error al obtener resumen", error: error.message })
+  }
+}
+// Simular una liquidación (Pre-visualización)
+exports.simularLiquidacion = async (req, res) => {
+  try {
+    const { profesional_id, periodo, tipo, obra_social_id, fecha_custom_inicio, fecha_custom_fin } = req.body
+
+    // Determinar fechas según el período seleccionado
+    let fechaInicio = new Date()
+    let fechaFin = new Date()
+
+    if (periodo === "hoy") {
+      fechaInicio.setHours(0, 0, 0, 0)
+      fechaFin.setHours(23, 59, 59, 999)
+    } else if (periodo === "semana") {
+      const day = fechaInicio.getDay()
+      const diff = fechaInicio.getDate() - day + (day === 0 ? -6 : 1) // Ajustar al lunes
+      fechaInicio.setDate(diff)
+      fechaInicio.setHours(0, 0, 0, 0)
+      fechaFin.setHours(23, 59, 59, 999)
+    } else if (periodo === "mes") {
+      fechaInicio.setDate(1)
+      fechaInicio.setHours(0, 0, 0, 0)
+      fechaFin.setHours(23, 59, 59, 999)
+    } else if (periodo === "custom") {
+      if (!fecha_custom_inicio || !fecha_custom_fin) {
+        return res.status(400).json({ message: "Debe especificar fecha de inicio y fin para rango personalizado" })
+      }
+      fechaInicio = new Date(fecha_custom_inicio)
+      fechaFin = new Date(fecha_custom_fin)
+      // Ajustar fin del día para la fecha fin
+      fechaFin.setHours(23, 59, 59, 999)
+    }
+
+    const where = {
+      profesional_id,
+      fecha: {
+        [Op.between]: [fechaInicio, fechaFin],
+      },
+      estado: "Pendiente", // Solo prestaciones no liquidadas
+      liquidacion_id: null,
+    }
+
+    // Filtros adicionales según el tipo
+    const include = [
+      {
+        model: Servicio,
+        as: "servicio",
+        attributes: ["nombre", "precio_base"],
+      },
+      {
+        model: Paciente,
+        as: "paciente",
+        attributes: ["id", "nombre", "apellido", "obra_social_id"],
+        include: [
+          {
+            model: require("../models").ObraSocial, // Importación dinámica para evitar ciclos si los hubiera
+            as: "obraSocial",
+            attributes: ["id", "nombre"],
+          },
+        ],
+      },
+    ]
+
+    // Lógica para filtrar por Obra Social vs Particulares
+    if (tipo === "obra_social") {
+      if (obra_social_id) {
+        // Filtrar por una obra social específica
+        where["$paciente.obra_social_id$"] = obra_social_id
+      } else {
+        // Filtrar solo pacientes con obra social (cualquiera)
+        where["$paciente.obra_social_id$"] = { [Op.ne]: null }
+      }
+    } else if (tipo === "pago_recibido") {
+      // Asumimos que "Pago recibido" se refiere a particulares o pagos directos
+      // Podríamos filtrar donde obra_social_id sea null, o simplemente todo lo que no sea OS
+      // Por ahora, si no es OS, traemos todo lo que coincida con las fechas
+    }
+
+    const prestaciones = await Prestacion.findAll({
+      where,
+      include,
+    })
+
+    // Calcular totales
+    const monto_total_servicios = prestaciones.reduce((sum, p) => sum + parseFloat(p.monto_total), 0)
+    const monto_profesional = prestaciones.reduce((sum, p) => sum + parseFloat(p.monto_profesional), 0)
+
+    res.json({
+      periodo_inicio: fechaInicio,
+      periodo_fin: fechaFin,
+      cantidad_prestaciones: prestaciones.length,
+      monto_total_servicios: monto_total_servicios.toFixed(2),
+      monto_profesional: monto_profesional.toFixed(2),
+      prestaciones,
+    })
+  } catch (error) {
+    console.error("Error al simular liquidación:", error)
+    res.status(500).json({ message: "Error al simular liquidación", error: error.message })
   }
 }

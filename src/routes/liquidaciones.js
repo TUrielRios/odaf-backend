@@ -30,5 +30,6 @@ router.post("/", validarGenerarLiquidacion, liquidacionController.generarLiquida
 router.put("/:id/pagar", validarRegistrarPago, liquidacionController.registrarPago)
 router.put("/:id/anular", validarAnularLiquidacion, liquidacionController.anularLiquidacion)
 router.get("/profesional/:profesional_id/resumen", liquidacionController.obtenerResumenPorProfesional)
+router.post("/simular", liquidacionController.simularLiquidacion)
 
 module.exports = router

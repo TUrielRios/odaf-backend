@@ -60,6 +60,7 @@ app.use("/api/prestaciones", prestacionRoutes)
 app.use("/api/liquidaciones", liquidacionRoutes)
 app.use("/api/obras-sociales", require("./routes/obras-sociales"))
 app.use("/api/copagos", require("./routes/copagos"))
+app.use("/api/cuenta-corriente", require("./routes/cuentaCorriente"))
 
 // Ruta de salud
 app.get("/health", (req, res) => {

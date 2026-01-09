@@ -80,6 +80,18 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.JSON,
         defaultValue: [],
       },
+      email: {
+        type: DataTypes.STRING,
+        validate: {
+          isEmail: true,
+        },
+      },
+      telefono: {
+        type: DataTypes.STRING,
+        validate: {
+          len: [0, 50],
+        },
+      },
       informacion_adicional: {
         type: DataTypes.TEXT,
       },

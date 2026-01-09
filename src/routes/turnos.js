@@ -26,7 +26,21 @@ const validacionActualizarTurno = [
     .withMessage("La duración debe estar entre 15 y 480 minutos"),
   body("estado")
     .optional()
-    .isIn(["Programado", "Confirmado", "En_Curso", "Completado", "Cancelado", "No_Asistio"])
+    .isIn([
+      "Pendiente",
+      "Confirmado",
+      "Completado",
+      "Cancelado",
+      "Creado",
+      "Esperando confirmación",
+      "Confirmado por email",
+      "Confirmado por SMS",
+      "Confirmado por Whatsapp",
+      "En sala de espera",
+      "Atendiéndose",
+      "Atendido",
+      "Ausente"
+    ])
     .withMessage("Estado inválido"),
 ]
 

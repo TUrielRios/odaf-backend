@@ -9,16 +9,19 @@ const listarServicios = async (req, res) => {
 
     const whereClause = {}
 
+    // Por defecto, solo mostrar servicios activos
+    if (!estado) {
+      whereClause.estado = "Activo"
+    } else if (estado) {
+      whereClause.estado = estado
+    }
+
     if (search) {
       whereClause[Op.or] = [{ nombre: { [Op.iLike]: `%${search}%` } }, { descripcion: { [Op.iLike]: `%${search}%` } }]
     }
 
     if (categoria) {
       whereClause.categoria = categoria
-    }
-
-    if (estado) {
-      whereClause.estado = estado
     }
 
     const { count, rows } = await Servicio.findAndCountAll({
@@ -119,15 +122,16 @@ const eliminarServicio = async (req, res) => {
   try {
     const { id } = req.params
 
-    const deletedRowsCount = await Servicio.destroy({
-      where: { id },
-    })
+    const servicio = await Servicio.findByPk(id)
 
-    if (deletedRowsCount === 0) {
+    if (!servicio) {
       return res.status(404).json({ error: "Servicio no encontrado" })
     }
 
-    res.json({ message: "Servicio eliminado correctamente" })
+    // Soft delete: cambiar estado a Inactivo en lugar de eliminar
+    await servicio.update({ estado: "Inactivo" })
+
+    res.json({ message: "Servicio marcado como inactivo correctamente" })
   } catch (error) {
     console.error("Error al eliminar servicio:", error)
     res.status(500).json({ error: "Error interno del servidor" })
@@ -246,7 +250,7 @@ const obtenerProfesionalesServicio = async (req, res) => {
             attributes: ["estado", "createdAt"],
             where: { estado: "Activo" },
           },
-          attributes: ["id", "nombre", "apellido", "especialidad", "telefono", "email"],
+          attributes: ["id", "nombre", "apellido", "especialidad", "telefono", "email", "estado"],
         },
       ],
     })

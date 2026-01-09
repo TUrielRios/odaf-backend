@@ -1,6 +1,7 @@
-const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio } = require("../models")
+const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio, Prestacion } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
+const { enviarConfirmacionTurno } = require("../services/emailService")
 
 const listarTurnos = async (req, res) => {
   try {
@@ -138,15 +139,17 @@ const crearTurno = async (req, res) => {
       })
     }
 
-    // Verificar restricción mensual: Un turno por mes por servicio para el paciente
-    const fechaTurno = new Date(req.body.fecha)
-    const primerDiaMes = new Date(fechaTurno.getFullYear(), fechaTurno.getMonth(), 1)
-    const ultimoDiaMes = new Date(fechaTurno.getFullYear(), fechaTurno.getMonth() + 1, 0)
+    // Verificar restricción mensual: Un turno por mes para el paciente (global)
+    const [year, month] = req.body.fecha.split("-")
+    const primerDiaMes = `${year}-${month}-01`
+    // Calculate last day of month
+    const lastDay = new Date(year, month, 0).getDate()
+    const ultimoDiaMes = `${year}-${month}-${lastDay}`
 
     const turnoMensualExistente = await Turno.findOne({
       where: {
         paciente_id: req.body.paciente_id,
-        servicio_id: req.body.servicio_id,
+        // Removed servicio_id check to make it global
         fecha: {
           [Op.between]: [primerDiaMes, ultimoDiaMes],
         },
@@ -156,7 +159,7 @@ const crearTurno = async (req, res) => {
 
     if (turnoMensualExistente) {
       return res.status(400).json({
-        error: "Ya posee un turno reservado para esta prestación en este mes.",
+        error: "El paciente ya posee un turno reservado en este mes.",
       })
     }
 
@@ -167,7 +170,7 @@ const crearTurno = async (req, res) => {
         {
           model: Paciente,
           as: "paciente",
-          attributes: ["id", "nombre", "apellido", "numero_documento"],
+          attributes: ["id", "nombre", "apellido", "numero_documento", "email"],
         },
         {
           model: Profesional,
@@ -186,6 +189,24 @@ const crearTurno = async (req, res) => {
         },
       ],
     })
+
+    // Enviar email de confirmación (no bloqueante)
+    if (turnoCompleto.paciente && turnoCompleto.paciente.email) {
+      enviarConfirmacionTurno(
+        {
+          paciente: turnoCompleto.paciente,
+          profesional: turnoCompleto.profesional,
+          servicio: turnoCompleto.servicio,
+          fecha: turnoCompleto.fecha,
+          hora_inicio: turnoCompleto.hora_inicio,
+          hora_fin: turnoCompleto.hora_fin,
+        },
+        turnoCompleto.paciente.email
+      ).catch((error) => {
+        console.error("No se pudo enviar email de confirmación:", error)
+        // No fallar la creación del turno si el email falla
+      })
+    }
 
     res.status(201).json(turnoCompleto)
   } catch (error) {
@@ -246,6 +267,47 @@ const actualizarTurno = async (req, res) => {
 
     if (updatedRowsCount === 0) {
       return res.status(404).json({ error: "Turno no encontrado" })
+    }
+
+    // Check if status changed to "Atendido" or any "Confirmado" variant
+    const estadosGeneradoresPrestacion = [
+      "Atendido",
+      "Confirmado",
+      "Confirmado por email",
+      "Confirmado por SMS",
+      "Confirmado por Whatsapp"
+    ];
+
+    if (estadosGeneradoresPrestacion.includes(req.body.estado)) {
+      const turno = await Turno.findByPk(id)
+      const existingPrestacion = await Prestacion.findOne({
+        where: { turno_id: id }
+      })
+
+      if (!existingPrestacion) {
+        const profesional = await Profesional.findByPk(turno.profesional_id)
+        const servicio = await Servicio.findByPk(turno.servicio_id)
+        const subservicio = turno.subservicio_id ? await SubServicio.findByPk(turno.subservicio_id) : null
+
+        const montoTotal = (turno.precio_final !== null && turno.precio_final !== undefined)
+          ? turno.precio_final
+          : (subservicio ? subservicio.precio : servicio.precio_base)
+
+        const porcentaje = profesional.porcentaje_comision || 50
+
+        await Prestacion.create({
+          turno_id: id,
+          profesional_id: turno.profesional_id,
+          paciente_id: turno.paciente_id,
+          servicio_id: turno.servicio_id,
+          subservicio_id: turno.subservicio_id,
+          fecha: turno.fecha,
+          monto_total: montoTotal,
+          porcentaje_profesional: porcentaje,
+          monto_profesional: (montoTotal * porcentaje) / 100,
+          estado: "Pendiente"
+        })
+      }
     }
 
     const turnoActualizado = await Turno.findByPk(id, {
@@ -357,10 +419,41 @@ const confirmarPago = async (req, res) => {
       await Turno.update(
         {
           pago_confirmado: true,
-          estado: "Confirmado"
+          estado: "Confirmado por email"
         },
         { where: { id } }
       )
+
+      // Create Prestacion if it doesn't exist
+      const existingPrestacion = await Prestacion.findOne({
+        where: { turno_id: id }
+      })
+
+      if (!existingPrestacion) {
+        const profesional = await Profesional.findByPk(turno.profesional_id)
+        const servicio = await Servicio.findByPk(turno.servicio_id)
+        const subservicio = turno.subservicio_id ? await SubServicio.findByPk(turno.subservicio_id) : null
+
+        const montoTotal = (turno.precio_final !== null && turno.precio_final !== undefined)
+          ? turno.precio_final
+          : (subservicio ? subservicio.precio : servicio.precio_base)
+
+        const porcentaje = profesional.porcentaje_comision || 50
+
+        await Prestacion.create({
+          turno_id: id,
+          profesional_id: turno.profesional_id,
+          paciente_id: turno.paciente_id,
+          servicio_id: turno.servicio_id,
+          subservicio_id: turno.subservicio_id,
+          fecha: turno.fecha,
+          monto_total: montoTotal,
+          porcentaje_profesional: porcentaje,
+          monto_profesional: (montoTotal * porcentaje) / 100,
+          estado: "Pendiente"
+        })
+      }
+
     } else {
       // Reject payment
       await Turno.update(
@@ -370,6 +463,11 @@ const confirmarPago = async (req, res) => {
         },
         { where: { id } }
       )
+
+      // Remove Prestacion if it exists (optional, but good for consistency)
+      await Prestacion.destroy({
+        where: { turno_id: id, liquidacion_id: null } // Only delete if not yet liquidated
+      })
     }
 
     const turnoActualizado = await Turno.findByPk(id, {
