@@ -4,7 +4,12 @@ const config = require("../config/database")
 const env = process.env.NODE_ENV || "development"
 const dbConfig = config[env]
 
-const sequelize = new Sequelize(dbConfig.database, dbConfig.username, dbConfig.password, dbConfig)
+let sequelize
+if (dbConfig.use_env_variable) {
+  sequelize = new Sequelize(process.env[dbConfig.use_env_variable], dbConfig)
+} else {
+  sequelize = new Sequelize(dbConfig.database, dbConfig.username, dbConfig.password, dbConfig)
+}
 
 console.log("[v0] Iniciando carga de modelos...")
 
@@ -28,7 +33,6 @@ const Prestacion = require("./prestacion")(sequelize, Sequelize.DataTypes)
 const Liquidacion = require("./liquidacion")(sequelize, Sequelize.DataTypes)
 const Copago = require("./copago")(sequelize, Sequelize.DataTypes)
 const MovimientoCuenta = require("./movimientoCuenta")(sequelize, Sequelize.DataTypes)
-
 
 // Definir asociaciones
 const models = {
