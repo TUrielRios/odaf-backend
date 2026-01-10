@@ -62,6 +62,23 @@ app.use("/api/obras-sociales", require("./routes/obras-sociales"))
 app.use("/api/copagos", require("./routes/copagos"))
 app.use("/api/cuenta-corriente", require("./routes/cuentaCorriente"))
 
+app.use("/auth", authRoutes)
+app.use("/pacientes", pacienteRoutes)
+app.use("/turnos", turnoRoutes)
+app.use("/profesionales", profesionalRoutes)
+app.use("/servicios", servicioRoutes)
+app.use("/configuracion", configuracionRoutes)
+app.use("/odontogramas", odontogramaRoutes)
+app.use("/historiales-clinicos", historialClinicoRoutes)
+app.use("/prescripciones", prescripcionRoutes)
+app.use("/planes-tratamiento", planTratamientoRoutes)
+app.use("/archivos", archivoRoutes)
+app.use("/prestaciones", prestacionRoutes)
+app.use("/liquidaciones", liquidacionRoutes)
+app.use("/obras-sociales", require("./routes/obras-sociales"))
+app.use("/copagos", require("./routes/copagos"))
+app.use("/cuenta-corriente", require("./routes/cuentaCorriente"))
+
 // Ruta de salud
 app.get("/health", (req, res) => {
   res.json({ status: "OK", timestamp: new Date().toISOString() })
