@@ -107,27 +107,18 @@ const crearTurno = async (req, res) => {
     }
 
     // Verificar disponibilidad del profesional
+    // Dos turnos se solapan si:
+    // 1. El nuevo turno comienza durante un turno existente: nuevo_inicio < existente_fin AND nuevo_inicio >= existente_inicio
+    // 2. El nuevo turno termina durante un turno existente: nuevo_fin > existente_inicio AND nuevo_fin <= existente_fin
+    // 3. El nuevo turno envuelve completamente al existente: nuevo_inicio <= existente_inicio AND nuevo_fin >= existente_fin
+    // Simplificado: hay conflicto si nuevo_inicio < existente_fin AND nuevo_fin > existente_inicio
     const turnoExistente = await Turno.findOne({
       where: {
         profesional_id: req.body.profesional_id,
         fecha: req.body.fecha,
-        [Op.or]: [
-          {
-            hora_inicio: {
-              [Op.between]: [req.body.hora_inicio, req.body.hora_fin],
-            },
-          },
-          {
-            hora_fin: {
-              [Op.between]: [req.body.hora_inicio, req.body.hora_fin],
-            },
-          },
-          {
-            [Op.and]: [
-              { hora_inicio: { [Op.lte]: req.body.hora_inicio } },
-              { hora_fin: { [Op.gte]: req.body.hora_fin } },
-            ],
-          },
+        [Op.and]: [
+          { hora_inicio: { [Op.lt]: req.body.hora_fin } },
+          { hora_fin: { [Op.gt]: req.body.hora_inicio } },
         ],
         estado: { [Op.ne]: "Cancelado" },
       },
@@ -371,24 +362,15 @@ const verificarDisponibilidad = async (req, res) => {
       })
     }
 
+    // Verificar si hay solapamiento de horarios
+    // Dos turnos se solapan si: nuevo_inicio < existente_fin AND nuevo_fin > existente_inicio
     const turnoExistente = await Turno.findOne({
       where: {
         profesional_id,
         fecha,
-        [Op.or]: [
-          {
-            hora_inicio: {
-              [Op.between]: [hora_inicio, hora_fin],
-            },
-          },
-          {
-            hora_fin: {
-              [Op.between]: [hora_inicio, hora_fin],
-            },
-          },
-          {
-            [Op.and]: [{ hora_inicio: { [Op.lte]: hora_inicio } }, { hora_fin: { [Op.gte]: hora_fin } }],
-          },
+        [Op.and]: [
+          { hora_inicio: { [Op.lt]: hora_fin } },
+          { hora_fin: { [Op.gt]: hora_inicio } },
         ],
         estado: { [Op.ne]: "Cancelado" },
       },
