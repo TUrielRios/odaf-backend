@@ -15,81 +15,108 @@ const STEPS = conversationState.constructor.STEPS;
  * Controller to handle WhatsApp messages from Twilio
  */
 const handleIncomingMessage = async (req, res) => {
-  const { From, Body } = req.body;
+  console.log('--- WhatsApp Incoming Webhook ---');
+  console.log('Payload:', JSON.stringify(req.body, null, 2));
+  
+  const { From, Body, To } = req.body;
   const userPhone = From;
-  const userInput = Body.trim();
+  const userInput = Body ? Body.trim() : '';
+
+  console.log(`From: ${userPhone}, To: ${To}, Input: "${userInput}"`);
 
   try {
     let state = conversationState.get(userPhone);
+    console.log(`Current State: ${state ? JSON.stringify(state) : 'None'}`);
     
     // Handle global commands
     if (userInput.toUpperCase() === 'CANCELAR' || userInput.toUpperCase() === 'INICIO') {
+      console.log('Global command detected: CANCELAR/INICIO');
       conversationState.clear(userPhone);
       return sendResponse(userPhone, "Operación cancelada. Escribe 'Turno' para comenzar de nuevo.");
     }
 
     if (!state) {
       if (userInput.toLowerCase().includes('turno') || userInput.toLowerCase().includes('hola')) {
+        console.log('Starting new booking flow');
         conversationState.set(userPhone, STEPS.AWAITING_DNI);
         return sendResponse(userPhone, "👋 ¡Hola! Bienvenido al sistema de turnos de ODAF. \n\nPara comenzar, por favor ingresa tu número de DNI (solo números).");
       }
+      console.log('No state and input not matching "turno/hola"');
       return sendResponse(userPhone, "Bienvenido a ODAF. Escribe 'Turno' para reservar una cita.");
     }
+
+    console.log(`Processing Step: ${state.step}`);
 
     // State Machine Dispatcher
     switch (state.step) {
       case STEPS.AWAITING_DNI:
+        console.log('Step: AWAITING_DNI');
         return await handleDNIInput(userPhone, userInput);
       
       case STEPS.AWAITING_PATIENT_NAME:
+        console.log('Step: AWAITING_PATIENT_NAME');
         conversationState.set(userPhone, STEPS.AWAITING_PATIENT_LASTNAME, { nombre: userInput });
         return sendResponse(userPhone, "Gracias. Ahora ingresa tu APELLIDO:");
 
       case STEPS.AWAITING_PATIENT_LASTNAME:
+        console.log('Step: AWAITING_PATIENT_LASTNAME');
         conversationState.set(userPhone, STEPS.AWAITING_PATIENT_DOB, { apellido: userInput });
         return sendResponse(userPhone, "Ingresa tu FECHA DE NACIMIENTO (formato AAAA-MM-DD):");
 
       case STEPS.AWAITING_PATIENT_DOB:
+        console.log('Step: AWAITING_PATIENT_DOB');
         if (!moment(userInput, 'YYYY-MM-DD', true).isValid()) {
+          console.log('Invalid DOB format received');
           return sendResponse(userPhone, "Formato inválido. Por favor usa AAAA-MM-DD (ej: 1990-05-25):");
         }
         conversationState.set(userPhone, STEPS.AWAITING_PATIENT_GENDER, { fecha_nacimiento: userInput });
         return sendResponse(userPhone, "Finalmente, indica tu SEXO:\n1. Masculino\n2. Femenino\n3. Otro\n(Responde con el número)");
 
       case STEPS.AWAITING_PATIENT_GENDER:
+        console.log('Step: AWAITING_PATIENT_GENDER');
         const genderMap = { '1': 'Masculino', '2': 'Femenino', '3': 'Otro' };
-        if (!genderMap[userInput]) return sendResponse(userPhone, "Por favor selecciona 1, 2 o 3.");
+        if (!genderMap[userInput]) {
+          console.log('Invalid gender selection');
+          return sendResponse(userPhone, "Por favor selecciona 1, 2 o 3.");
+        }
         
         const patientData = { ...state.data, sexo: genderMap[userInput], telefono: userPhone.replace('whatsapp:', '') };
+        console.log('Creating new patient with data:', JSON.stringify(patientData));
         const newPatient = await whatsappService.createPatient(patientData);
         conversationState.set(userPhone, STEPS.SELECTING_SERVICE, { paciente_id: newPatient.id, patientName: `${newPatient.nombre} ${newPatient.apellido}` });
         return await showServices(userPhone);
 
       case STEPS.SELECTING_SERVICE:
+        console.log('Step: SELECTING_SERVICE');
         return await handleServiceSelection(userPhone, userInput, state);
 
       case STEPS.SELECTING_PROFESIONAL:
+        console.log('Step: SELECTING_PROFESIONAL');
         return await handleProfessionalSelection(userPhone, userInput, state);
 
       case STEPS.SELECTING_DATE:
+        console.log('Step: SELECTING_DATE');
         return await handleDateSelection(userPhone, userInput, state);
 
       case STEPS.SELECTING_TIME:
+        console.log('Step: SELECTING_TIME');
         return await handleTimeSelection(userPhone, userInput, state);
 
       case STEPS.CONFIRMING_BOOKING:
+        console.log('Step: CONFIRMING_BOOKING');
         return await handleFinalConfirmation(userPhone, userInput, state);
 
       default:
+        console.log(`Unknown step: ${state.step}`);
         conversationState.clear(userPhone);
         return sendResponse(userPhone, "Lo siento, ocurrió un error en el flujo. Escribe 'Turno' para empezar de nuevo.");
     }
 
   } catch (error) {
-    console.error('WhatsApp Controller Error:', error);
-    return sendResponse(userPhone, "Ocurrió un error inesperado. Por favor intenta más tarde.");
+    console.error('CRITICAL: WhatsApp Controller Error:', error);
+    return sendResponse(userPhone, "Ocurrió un error inesperado en el servidor. Por favor intenta más tarde.");
   } finally {
-    // Twilio expects a valid XML response (even if empty) to acknowledge the webhook
+    console.log('--- End of Webhook Processing ---');
     res.set('Content-Type', 'text/xml');
     res.status(200).send('<Response></Response>');
   }
@@ -221,14 +248,19 @@ const handleTimeSelection = async (phone, input, state) => {
 };
 
 const handleFinalConfirmation = async (phone, input, state) => {
+  console.log(`Final confirmation input: "${input}"`);
   if (input.toUpperCase() === 'SÍ' || input.toUpperCase() === 'SI' || input.toUpperCase() === 'CONFIRMAR') {
+    console.log('User confirmed. Proceeding to book.');
     const turno = await whatsappService.confirmBooking(state.data);
+    console.log('Turno created success:', turno.id);
     conversationState.clear(phone);
     return sendResponse(phone, `✅ ¡Excelente! Tu turno ha sido confirmado.\n\nTe esperamos el ${moment(state.data.fecha).format('DD/MM')} a las ${state.data.hora}.\n\n¡Gracias por confiar en ODAF!`);
   } else if (input.toUpperCase() === 'NO') {
+    console.log('User declined. Clearing state.');
     conversationState.clear(phone);
     return sendResponse(phone, "Reserva cancelada. Puedes empezar de nuevo cuando quieras escribiendo 'Turno'.");
   } else {
+    console.log('Ambiguous confirmation input');
     return sendResponse(phone, "Por favor responde *SÍ* para confirmar o *NO* para cancelar.");
   }
 };
@@ -236,14 +268,20 @@ const handleFinalConfirmation = async (phone, input, state) => {
 // --- Helper Functions ---
 
 const sendResponse = async (to, message) => {
+  console.log(`Sending WhatsApp response to ${to}...`);
+  console.log(`Message Content: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
   try {
-    await client.messages.create({
+    const result = await client.messages.create({
       body: message,
       from: fromNumber,
       to: to
     });
+    console.log(`Message sent! SID: ${result.sid}`);
+    return result;
   } catch (error) {
-    console.error('Twilio Send Error:', error);
+    console.error('TWILIO SEND ERROR:', error.message);
+    if (error.code) console.error(`Error Code: ${error.code}`);
+    throw error; // Rethrow to be caught by the main try-catch
   }
 };
 
