@@ -2,12 +2,16 @@ const twilio = require('twilio');
 const whatsappService = require('../services/whatsappService');
 const conversationState = require('../services/conversationState');
 const moment = require('moment');
+require('moment/locale/es'); // Configure Spanish locale
+moment.locale('es');
 
 // Twilio Setup
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = twilio(accountSid, authToken);
 const fromNumber = process.env.TWILIO_WHATSAPP_NUMBER;
+
+console.log(`WhatsApp Controller Initialized with Number: ${fromNumber}`);
 
 const STEPS = conversationState.constructor.STEPS;
 
@@ -185,7 +189,7 @@ const handleProfessionalSelection = async (phone, input, state) => {
 
   const selectedPro = pros[index];
   
-  // Offer next 7 available days (excluding Sundays)
+  // Offer next 5 available days (excluding Sundays)
   let message = "¿Para cuándo deseas tu turno?:\n\n";
   const dates = [];
   let current = moment();
@@ -193,7 +197,9 @@ const handleProfessionalSelection = async (phone, input, state) => {
     current.add(1, 'day');
     if (current.day() !== 0) { // No Sundays
       dates.push(current.format('YYYY-MM-DD'));
-      message += `${dates.length}. ${current.format('dddd DD/MM')}\n`;
+      const dayName = current.format('dddd');
+      const capitalizedDay = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      message += `${dates.length}. ${capitalizedDay} ${current.format('DD/MM')}\n`;
     }
   }
 

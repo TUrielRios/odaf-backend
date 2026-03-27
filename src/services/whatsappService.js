@@ -10,14 +10,18 @@ class WhatsAppService {
    * Find a patient by document number
    */
   async findPatientByDocument(numero_documento) {
-    return await Paciente.findOne({ where: { numero_documento } });
+    console.log(`[WhatsAppService] Buscando paciente con DNI: ${numero_documento}`);
+    const patient = await Paciente.findOne({ where: { numero_documento } });
+    console.log(`[WhatsAppService] Paciente encontrado: ${patient ? 'SÍ (' + patient.id + ')' : 'NO'}`);
+    return patient;
   }
 
   /**
    * Create a new patient from collected data
    */
   async createPatient(data) {
-    return await Paciente.create({
+    console.log(`[WhatsAppService] Creando nuevo paciente: ${data.nombre} ${data.apellido}`);
+    const patient = await Paciente.create({
       nombre: data.nombre,
       apellido: data.apellido,
       tipo_documento: 'DNI',
@@ -28,6 +32,8 @@ class WhatsAppService {
       tipo_facturacion: 'B',
       condicion: 'Activo'
     });
+    console.log(`[WhatsAppService] Paciente creado con éxito. ID: ${patient.id}`);
+    return patient;
   }
 
   /**
@@ -104,6 +110,7 @@ class WhatsAppService {
   async hasTurnoThisMonth(paciente_id) {
     const startOfMonth = moment().startOf('month').format('YYYY-MM-DD');
     const endOfMonth = moment().endOf('month').format('YYYY-MM-DD');
+    console.log(`[WhatsAppService] Verificando turnos en el mes para paciente ${paciente_id} (${startOfMonth} a ${endOfMonth})`);
 
     const existing = await Turno.findOne({
       where: {
@@ -115,6 +122,7 @@ class WhatsAppService {
       }
     });
 
+    console.log(`[WhatsAppService] ¿Tiene turno este mes?: ${existing ? 'SÍ' : 'NO'}`);
     return !!existing;
   }
 
@@ -124,8 +132,9 @@ class WhatsAppService {
   async confirmBooking(data) {
     const hora_inicio = data.hora;
     const hora_fin = moment(data.hora, 'HH:mm').add(30, 'minutes').format('HH:mm');
+    console.log(`[WhatsAppService] Confirmando reserva: Paciente ${data.paciente_id}, Prof ${data.profesional_id}, Fecha ${data.fecha}, Hora ${hora_inicio}`);
 
-    return await Turno.create({
+    const turno = await Turno.create({
       paciente_id: data.paciente_id,
       profesional_id: data.profesional_id,
       servicio_id: data.servicio_id,
@@ -134,6 +143,8 @@ class WhatsAppService {
       hora_fin,
       estado: 'Confirmado por Whatsapp'
     });
+    console.log(`[WhatsAppService] Turno confirmado con ID: ${turno.id}`);
+    return turno;
   }
 }
 
