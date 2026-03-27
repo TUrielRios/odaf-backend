@@ -18,6 +18,7 @@ const planTratamientoRoutes = require("./routes/planes-tratamiento")
 const archivoRoutes = require("./routes/archivos")
 const prestacionRoutes = require("./routes/prestaciones")
 const liquidacionRoutes = require("./routes/liquidaciones")
+const whatsappRoutes = require("./routes/whatsapp")
 
 const app = express()
 
@@ -78,6 +79,9 @@ app.use("/liquidaciones", liquidacionRoutes)
 app.use("/obras-sociales", require("./routes/obras-sociales"))
 app.use("/copagos", require("./routes/copagos"))
 app.use("/cuenta-corriente", require("./routes/cuentaCorriente"))
+
+// WhatsApp routes (Twilio)
+app.use("/api/whatsapp", whatsappRoutes)
 
 // Ruta de salud
 app.get("/health", (req, res) => {

@@ -2,6 +2,7 @@ const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
 const { enviarConfirmacionTurno } = require("../services/emailService")
+const { enviarConfirmacionTurnoWhatsApp } = require("../services/whatsappNotifications")
 
 const listarTurnos = async (req, res) => {
   try {
@@ -196,6 +197,24 @@ const crearTurno = async (req, res) => {
       ).catch((error) => {
         console.error("No se pudo enviar email de confirmación:", error)
         // No fallar la creación del turno si el email falla
+      })
+    }
+
+    // Enviar notificación de WhatsApp (no bloqueante)
+    if (turnoCompleto.paciente && turnoCompleto.paciente.telefono) {
+      enviarConfirmacionTurnoWhatsApp({
+        telefono: turnoCompleto.paciente.telefono,
+        paciente_nombre: turnoCompleto.paciente.nombre,
+        paciente_apellido: turnoCompleto.paciente.apellido,
+        servicio_nombre: turnoCompleto.servicio.nombre,
+        profesional_nombre: turnoCompleto.profesional.nombre,
+        profesional_apellido: turnoCompleto.profesional.apellido,
+        fecha: turnoCompleto.fecha,
+        hora_inicio: turnoCompleto.hora_inicio,
+        hora_fin: turnoCompleto.hora_fin,
+      }).catch((error) => {
+        console.error("No se pudo enviar WhatsApp de confirmación:", error)
+        // No fallar la creación del turno si el WhatsApp falla
       })
     }
 
