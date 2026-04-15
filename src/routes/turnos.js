@@ -47,9 +47,12 @@ const validacionActualizarTurno = [
 // Rutas
 router.get("/", turnoController.listarTurnos)
 router.post("/", validacionCrearTurno, turnoController.crearTurno)
+router.get("/mis-turnos", turnoController.misTurnos)
 router.get("/:id", turnoController.obtenerTurno)
 router.put("/:id", validacionActualizarTurno, turnoController.actualizarTurno)
 router.put("/:id/confirmar-pago", turnoController.confirmarPago)
+router.post("/:id/cancelar", turnoController.cancelarTurno)
+router.put("/:id/reprogramar", turnoController.reprogramarTurno)
 router.delete("/:id", turnoController.eliminarTurno)
 router.get("/disponibilidad/:profesional_id", turnoController.verificarDisponibilidad)
 

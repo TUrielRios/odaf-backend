@@ -1,8 +1,10 @@
-const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio, Prestacion } = require("../models")
+const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio, Prestacion, UsuarioPaciente } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
-const { enviarConfirmacionTurno } = require("../services/emailService")
+const jwt = require("jsonwebtoken")
+const { enviarConfirmacionTurno, enviarCancelacionTurno, enviarReprogramacionTurno } = require("../services/emailService")
 const { enviarConfirmacionTurnoWhatsApp } = require("../services/whatsappNotifications")
+const bcrypt = require("bcryptjs")
 
 const listarTurnos = async (req, res) => {
   try {
@@ -107,52 +109,48 @@ const crearTurno = async (req, res) => {
       }
     }
 
-    // Verificar disponibilidad del profesional
-    // Dos turnos se solapan si:
-    // 1. El nuevo turno comienza durante un turno existente: nuevo_inicio < existente_fin AND nuevo_inicio >= existente_inicio
-    // 2. El nuevo turno termina durante un turno existente: nuevo_fin > existente_inicio AND nuevo_fin <= existente_fin
-    // 3. El nuevo turno envuelve completamente al existente: nuevo_inicio <= existente_inicio AND nuevo_fin >= existente_fin
-    // Simplificado: hay conflicto si nuevo_inicio < existente_fin AND nuevo_fin > existente_inicio
-    const turnoExistente = await Turno.findOne({
-      where: {
-        profesional_id: req.body.profesional_id,
-        fecha: req.body.fecha,
-        [Op.and]: [
-          { hora_inicio: { [Op.lt]: req.body.hora_fin } },
-          { hora_fin: { [Op.gt]: req.body.hora_inicio } },
-        ],
-        estado: { [Op.ne]: "Cancelado" },
-      },
-    })
-
-    if (turnoExistente) {
-      return res.status(400).json({
-        error: "El profesional ya tiene un turno asignado en ese horario",
-      })
-    }
-
-    // Verificar restricción mensual: Un turno por mes para el paciente (global)
-    const [year, month] = req.body.fecha.split("-")
-    const primerDiaMes = `${year}-${month}-01`
-    // Calculate last day of month
-    const lastDay = new Date(year, month, 0).getDate()
-    const ultimoDiaMes = `${year}-${month}-${lastDay}`
-
-    const turnoMensualExistente = await Turno.findOne({
-      where: {
-        paciente_id: req.body.paciente_id,
-        // Removed servicio_id check to make it global
-        fecha: {
-          [Op.between]: [primerDiaMes, ultimoDiaMes],
+    // Si se envía sobre_turno: true, saltamos las validaciones de superposición y límites
+    if (!req.body.sobre_turno) {
+      // Verificar disponibilidad del profesional
+      const turnoExistente = await Turno.findOne({
+        where: {
+          profesional_id: req.body.profesional_id,
+          fecha: req.body.fecha,
+          [Op.and]: [
+            { hora_inicio: { [Op.lt]: req.body.hora_fin } },
+            { hora_fin: { [Op.gt]: req.body.hora_inicio } },
+          ],
+          estado: { [Op.ne]: "Cancelado" },
         },
-        estado: { [Op.ne]: "Cancelado" },
-      },
-    })
-
-    if (turnoMensualExistente) {
-      return res.status(400).json({
-        error: "El paciente ya posee un turno reservado en este mes.",
       })
+
+      if (turnoExistente) {
+        return res.status(400).json({
+          error: "El profesional ya tiene un turno asignado en ese horario",
+        })
+      }
+
+      // Verificar restricción mensual: Un turno por mes para el paciente (global)
+      const [year, month] = req.body.fecha.split("-")
+      const primerDiaMes = `${year}-${month}-01`
+      const lastDay = new Date(year, month, 0).getDate()
+      const ultimoDiaMes = `${year}-${month}-${lastDay}`
+
+      const turnoMensualExistente = await Turno.findOne({
+        where: {
+          paciente_id: req.body.paciente_id,
+          fecha: {
+            [Op.between]: [primerDiaMes, ultimoDiaMes],
+          },
+          estado: { [Op.ne]: "Cancelado" },
+        },
+      })
+
+      if (turnoMensualExistente) {
+        return res.status(400).json({
+          error: "El paciente ya posee un turno reservado en este mes.",
+        })
+      }
     }
 
     const turno = await Turno.create(req.body)
@@ -182,8 +180,23 @@ const crearTurno = async (req, res) => {
       ],
     })
 
-    // Enviar email de confirmación (no bloqueante)
-    if (turnoCompleto.paciente && turnoCompleto.paciente.email) {
+    // Crear usuario paciente automaticamente si no existe
+    if (turnoCompleto.paciente && turnoCompleto.paciente.email && turnoCompleto.paciente.numero_documento) {
+      const usuarioExistente = await UsuarioPaciente.findOne({
+        where: { email: turnoCompleto.paciente.email },
+      })
+
+      if (!usuarioExistente) {
+        const hashedDni = await bcrypt.hash(turnoCompleto.paciente.numero_documento, 10)
+        await UsuarioPaciente.create({
+          email: turnoCompleto.paciente.email,
+          dni_hash: hashedDni,
+          paciente_id: turnoCompleto.paciente_id,
+        })
+        console.log("Usuario paciente creado automaticamente para:", turnoCompleto.paciente.email)
+      }
+
+      // Enviar email de confirmacion
       enviarConfirmacionTurno(
         {
           paciente: turnoCompleto.paciente,
@@ -192,11 +205,11 @@ const crearTurno = async (req, res) => {
           fecha: turnoCompleto.fecha,
           hora_inicio: turnoCompleto.hora_inicio,
           hora_fin: turnoCompleto.hora_fin,
+          turnoId: turno.id,
         },
         turnoCompleto.paciente.email
       ).catch((error) => {
-        console.error("No se pudo enviar email de confirmación:", error)
-        // No fallar la creación del turno si el email falla
+        console.error("No se pudo enviar email de confirmacion:", error)
       })
     }
 
@@ -408,7 +421,7 @@ const verificarDisponibilidad = async (req, res) => {
 const confirmarPago = async (req, res) => {
   try {
     const { id } = req.params
-    const { confirmar } = req.body // true = confirm, false = reject
+    const { confirmar } = req.body
 
     const turno = await Turno.findByPk(id)
     if (!turno) {
@@ -416,7 +429,6 @@ const confirmarPago = async (req, res) => {
     }
 
     if (confirmar) {
-      // Confirm payment
       await Turno.update(
         {
           pago_confirmado: true,
@@ -425,7 +437,6 @@ const confirmarPago = async (req, res) => {
         { where: { id } }
       )
 
-      // Create Prestacion if it doesn't exist
       const existingPrestacion = await Prestacion.findOne({
         where: { turno_id: id }
       })
@@ -456,7 +467,6 @@ const confirmarPago = async (req, res) => {
       }
 
     } else {
-      // Reject payment
       await Turno.update(
         {
           pago_confirmado: false,
@@ -465,9 +475,8 @@ const confirmarPago = async (req, res) => {
         { where: { id } }
       )
 
-      // Remove Prestacion if it exists (optional, but good for consistency)
       await Prestacion.destroy({
-        where: { turno_id: id, liquidacion_id: null } // Only delete if not yet liquidated
+        where: { turno_id: id, liquidacion_id: null }
       })
     }
 
@@ -501,6 +510,198 @@ const confirmarPago = async (req, res) => {
   }
 }
 
+const misTurnos = async (req, res) => {
+  try {
+    const token = req.header("Authorization")?.replace("Bearer ", "")
+    let pacienteId = req.user?.pacienteId
+    
+    if (!pacienteId && token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET || "dental_clinic_secret")
+        pacienteId = decoded.pacienteId
+      } catch (e) {}
+    }
+    
+    if (!pacienteId) {
+      return res.status(401).json({ error: "No autenticado" })
+    }
+
+    const turnos = await Turno.findAll({
+      where: { paciente_id: pacienteId },
+      include: [
+        {
+          model: Profesional,
+          as: "profesional",
+          attributes: ["id", "nombre", "apellido", "especialidad"],
+        },
+        {
+          model: Servicio,
+          as: "servicio",
+          attributes: ["id", "nombre"],
+        },
+      ],
+      order: [
+        ["fecha", "DESC"],
+        ["hora_inicio", "DESC"],
+      ],
+    })
+
+    res.json(turnos)
+  } catch (error) {
+    console.error("Error al obtener turnos del paciente:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+}
+
+const cancelarTurno = async (req, res) => {
+  try {
+    const { id } = req.params
+    const pacienteId = req.user.pacienteId
+
+    const turno = await Turno.findByPk(id, {
+      include: [
+        {
+          model: Paciente,
+          as: "paciente",
+        },
+        {
+          model: Profesional,
+          as: "profesional",
+        },
+        {
+          model: Servicio,
+          as: "servicio",
+        },
+      ],
+    })
+
+    if (!turno) {
+      return res.status(404).json({ error: "Turno no encontrado" })
+    }
+
+    if (turno.paciente_id !== pacienteId) {
+      return res.status(403).json({ error: "No tienes permiso para cancelar este turno" })
+    }
+
+    if (turno.estado === "Cancelado") {
+      return res.status(400).json({ error: "Este turno ya esta cancelado" })
+    }
+
+    if (turno.estado === "Atendido") {
+      return res.status(400).json({ error: "No se puede cancelar un turno ya atendido" })
+    }
+
+    await Turno.update({ estado: "Cancelado" }, { where: { id } })
+
+    enviarCancelacionTurno(
+      {
+        paciente: turno.paciente,
+        profesional: turno.profesional,
+        servicio: turno.servicio,
+        fecha: turno.fecha,
+        hora_inicio: turno.hora_inicio,
+      },
+      turno.paciente.email
+    ).catch((error) => {
+      console.error("Error al enviar email de cancelacion:", error)
+    })
+
+    res.json({ message: "Turno cancelado exitosamente" })
+  } catch (error) {
+    console.error("Error al cancelar turno:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+}
+
+const reprogramarTurno = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { fecha, hora_inicio, hora_fin } = req.body
+    const pacienteId = req.user.pacienteId
+
+    const turno = await Turno.findByPk(id, {
+      include: [
+        { model: Paciente, as: "paciente" },
+        { model: Profesional, as: "profesional" },
+        { model: Servicio, as: "servicio" },
+      ],
+    })
+
+    if (!turno) {
+      return res.status(404).json({ error: "Turno no encontrado" })
+    }
+
+    if (turno.paciente_id !== pacienteId) {
+      return res.status(403).json({ error: "No tienes permiso para reprogramar este turno" })
+    }
+
+    if (turno.estado === "Cancelado") {
+      return res.status(400).json({ error: "No se puede reprogramar un turno cancelado" })
+    }
+
+    if (turno.estado === "Atendido") {
+      return res.status(400).json({ error: "No se puede reprogramar un turno ya atendido" })
+    }
+
+    const fechaAnterior = turno.fecha
+
+    const turnoExistente = await Turno.findOne({
+      where: {
+        profesional_id: turno.profesional_id,
+        id: { [Op.ne]: id },
+        fecha,
+        [Op.and]: [
+          { hora_inicio: { [Op.lt]: hora_fin } },
+          { hora_fin: { [Op.gt]: hora_inicio } },
+        ],
+        estado: { [Op.ne]: "Cancelado" },
+      },
+    })
+
+    if (turnoExistente) {
+      return res.status(400).json({
+        error: "El profesional ya tiene un turno asignado en ese horario",
+      })
+    }
+
+    await Turno.update(
+      { fecha, hora_inicio, hora_fin },
+      { where: { id } }
+    )
+
+    const turnoActualizado = await Turno.findByPk(id, {
+      include: [
+        { model: Profesional, as: "profesional" },
+        { model: Servicio, as: "servicio" },
+      ],
+    })
+
+    enviarReprogramacionTurno(
+      {
+        paciente: turno.paciente,
+        profesional: turnoActualizado.profesional,
+        servicio: turnoActualizado.servicio,
+        fecha,
+        hora_inicio,
+        hora_fin,
+        turnoId: id,
+      },
+      turno.paciente.email,
+      fechaAnterior
+    ).catch((error) => {
+      console.error("Error al enviar email de reprogramacion:", error)
+    })
+
+    res.json({
+      message: "Turno reprogramado exitosamente",
+      turno: turnoActualizado,
+    })
+  } catch (error) {
+    console.error("Error al reprogramar turno:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+}
+
 module.exports = {
   listarTurnos,
   crearTurno,
@@ -509,4 +710,7 @@ module.exports = {
   eliminarTurno,
   verificarDisponibilidad,
   confirmarPago,
+  misTurnos,
+  cancelarTurno,
+  reprogramarTurno,
 }

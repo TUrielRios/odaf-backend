@@ -6,6 +6,9 @@ const {
   Prescripcion,
   PlanTratamiento,
   Archivo,
+  Turno,
+  Prestacion,
+  UsuarioPaciente,
 } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
@@ -211,6 +214,15 @@ const actualizarPaciente = async (req, res) => {
 const eliminarPaciente = async (req, res) => {
   try {
     const { id } = req.params
+
+    await Turno.destroy({ where: { paciente_id: id } })
+    await Prestacion.destroy({ where: { paciente_id: id } })
+    await HistorialClinico.destroy({ where: { paciente_id: id } })
+    await PlanTratamiento.destroy({ where: { paciente_id: id } })
+    await Odontograma.destroy({ where: { paciente_id: id } })
+    await Archivo.destroy({ where: { paciente_id: id } })
+    await Prescripcion.destroy({ where: { paciente_id: id } })
+    await UsuarioPaciente.destroy({ where: { paciente_id: id } })
 
     const deletedRowsCount = await Paciente.destroy({
       where: { id },

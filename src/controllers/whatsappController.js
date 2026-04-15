@@ -189,12 +189,15 @@ const handleProfessionalSelection = async (phone, input, state) => {
 
   const selectedPro = pros[index];
   
-  // Offer next 5 available days (excluding Sundays)
+  // Offer next 30 available days (excluding Sundays)
   let message = "¿Para cuándo deseas tu turno?:\n\n";
   const dates = [];
   let current = moment();
-  while (dates.length < 5) {
+  let daysAdded = 0;
+  // Look ahead up to 40 days to ensure we offer around 30 working days
+  while (dates.length < 30 && daysAdded < 40) {
     current.add(1, 'day');
+    daysAdded++;
     if (current.day() !== 0) { // No Sundays
       dates.push(current.format('YYYY-MM-DD'));
       const dayName = current.format('dddd');

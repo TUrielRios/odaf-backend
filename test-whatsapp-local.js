@@ -15,7 +15,7 @@ data.append('To', 'whatsapp:+5491168890924');
 async function test() {
   console.log(`Simulando mensaje de WhatsApp: "${message}" desde ${phone}`);
   try {
-    const response = await axios.post('http://localhost:3000/api/whatsapp/webhook', data, {
+    const response = await axios.post('https://odaf-backend-production.up.railway.app/api/whatsapp/webhook', data, {
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded'
       }

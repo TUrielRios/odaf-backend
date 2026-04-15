@@ -19,12 +19,13 @@ const archivoRoutes = require("./routes/archivos")
 const prestacionRoutes = require("./routes/prestaciones")
 const liquidacionRoutes = require("./routes/liquidaciones")
 const whatsappRoutes = require("./routes/whatsapp")
+const usuarioPacienteRoutes = require("./routes/usuarios-pacientes")
 
 const app = express()
 
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
+    origin: [process.env.FRONTEND_URL, "http://localhost:5173"],
     credentials: true,
   }),
 )
@@ -82,6 +83,9 @@ app.use("/cuenta-corriente", require("./routes/cuentaCorriente"))
 
 // WhatsApp routes (Twilio)
 app.use("/api/whatsapp", whatsappRoutes)
+
+// Portal paciente routes
+app.use("/api/usuarios-pacientes", usuarioPacienteRoutes)
 
 // Ruta de salud
 app.get("/health", (req, res) => {

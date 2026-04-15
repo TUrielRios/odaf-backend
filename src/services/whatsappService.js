@@ -105,24 +105,23 @@ class WhatsAppService {
   }
 
   /**
-   * Check if patient already has a turno this month
+   * Check if patient already has a future turno active (so they can only book 1 at a time)
    */
   async hasTurnoThisMonth(paciente_id) {
-    const startOfMonth = moment().startOf('month').format('YYYY-MM-DD');
-    const endOfMonth = moment().endOf('month').format('YYYY-MM-DD');
-    console.log(`[WhatsAppService] Verificando turnos en el mes para paciente ${paciente_id} (${startOfMonth} a ${endOfMonth})`);
+    const today = moment().format('YYYY-MM-DD');
+    console.log(`[WhatsAppService] Verificando si el paciente ${paciente_id} ya posee un turno futuro (desde ${today})`);
 
     const existing = await Turno.findOne({
       where: {
         paciente_id,
         fecha: {
-          [Op.between]: [startOfMonth, endOfMonth]
+          [Op.gte]: today
         },
         estado: { [Op.notIn]: ['Cancelado', 'Ausente'] }
       }
     });
 
-    console.log(`[WhatsAppService] ¿Tiene turno este mes?: ${existing ? 'SÍ' : 'NO'}`);
+    console.log(`[WhatsAppService] ¿Tiene turno futuro?: ${existing ? 'SÍ' : 'NO'}`);
     return !!existing;
   }
 
