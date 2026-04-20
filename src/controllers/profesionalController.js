@@ -1,6 +1,7 @@
 const { Profesional, ProfesionalServicio, Servicio, Turno } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
+const { cloudinary } = require("../services/imageService")
 
 const listarProfesionales = async (req, res) => {
   try {
@@ -166,11 +167,11 @@ const obtenerHorariosProfesional = async (req, res) => {
     if (!horarios || Object.keys(horarios).length === 0) {
       // Horarios por defecto
       horarios = {
-        lunes: { activo: true, rangos: [{ inicio: "08:00", fin: "17:00" }] },
-        martes: { activo: true, rangos: [{ inicio: "08:00", fin: "17:00" }] },
-        miercoles: { activo: true, rangos: [{ inicio: "08:00", fin: "17:00" }] },
-        jueves: { activo: true, rangos: [{ inicio: "08:00", fin: "17:00" }] },
-        viernes: { activo: true, rangos: [{ inicio: "08:00", fin: "17:00" }] },
+        lunes: { activo: true, rangos: [{ inicio: "09:00", fin: "12:00" }, { inicio: "14:00", fin: "18:00" }] },
+        martes: { activo: true, rangos: [{ inicio: "09:00", fin: "12:00" }, { inicio: "14:00", fin: "18:00" }] },
+        miercoles: { activo: true, rangos: [{ inicio: "09:00", fin: "12:00" }, { inicio: "14:00", fin: "16:00" }] },
+        jueves: { activo: true, rangos: [{ inicio: "09:00", fin: "12:00" }, { inicio: "14:00", fin: "18:00" }] },
+        viernes: { activo: true, rangos: [{ inicio: "10:00", fin: "12:30" }, { inicio: "14:00", fin: "16:30" }] },
         sabado: { activo: false, rangos: [{ inicio: "09:00", fin: "13:00" }] },
         domingo: { activo: false, rangos: [{ inicio: "00:00", fin: "00:00" }] },
       }
@@ -208,6 +209,19 @@ const actualizarHorariosProfesional = async (req, res) => {
         if (typeof horario.activo !== "boolean") {
           return res.status(400).json({
             error: `El día ${dia} debe tener la propiedad 'activo' como boolean`,
+          })
+        }
+
+        // Validar frecuencia y semana_inicio si están presentes
+        if (horario.frecuencia && !["semanal", "quincenal"].includes(horario.frecuencia)) {
+          return res.status(400).json({
+            error: `El día ${dia} tiene una frecuencia inválida. Use 'semanal' o 'quincenal'`,
+          })
+        }
+
+        if (horario.semana_inicio !== undefined && ![0, 1].includes(horario.semana_inicio)) {
+          return res.status(400).json({
+            error: `El día ${dia} tiene una semana de inicio inválida. Use 0 (Semana 1) o 1 (Semana 2)`,
           })
         }
 
@@ -346,11 +360,11 @@ const obtenerHorariosDisponibles = async (req, res) => {
     if (!horarios || Object.keys(horarios).length === 0) {
       // Horarios por defecto
       horarios = {
-        lunes: { activo: true, rangos: [{ inicio: "08:00", fin: "17:00" }] },
-        martes: { activo: true, rangos: [{ inicio: "08:00", fin: "17:00" }] },
-        miercoles: { activo: true, rangos: [{ inicio: "08:00", fin: "17:00" }] },
-        jueves: { activo: true, rangos: [{ inicio: "08:00", fin: "17:00" }] },
-        viernes: { activo: true, rangos: [{ inicio: "08:00", fin: "17:00" }] },
+        lunes: { activo: true, rangos: [{ inicio: "09:00", fin: "12:00" }, { inicio: "14:00", fin: "18:00" }] },
+        martes: { activo: true, rangos: [{ inicio: "09:00", fin: "12:00" }, { inicio: "14:00", fin: "18:00" }] },
+        miercoles: { activo: true, rangos: [{ inicio: "09:00", fin: "12:00" }, { inicio: "14:00", fin: "16:00" }] },
+        jueves: { activo: true, rangos: [{ inicio: "09:00", fin: "12:00" }, { inicio: "14:00", fin: "18:00" }] },
+        viernes: { activo: true, rangos: [{ inicio: "10:00", fin: "12:30" }, { inicio: "14:00", fin: "16:30" }] },
         sabado: { activo: false, rangos: [{ inicio: "09:00", fin: "13:00" }] },
         domingo: { activo: false, rangos: [{ inicio: "00:00", fin: "00:00" }] },
       }
@@ -364,6 +378,24 @@ const obtenerHorariosDisponibles = async (req, res) => {
         mensaje: `El profesional no atiende los ${diaSemana}s`,
         horarios_disponibles: [],
       })
+    }
+
+    // Verificar si es quincenal
+    if (horarioDia.frecuencia === "quincenal") {
+      const refDate = new Date("2024-01-01T00:00:00") // Lunes 1 de Enero 2024 (Referencia fija)
+      const diffInMs = fechaObj - refDate
+      const diffInWeeks = Math.floor(diffInMs / (7 * 24 * 60 * 60 * 1000))
+      const semanaActual = Math.abs(diffInWeeks % 2) // 0 o 1
+      
+      const semanaInicio = horarioDia.semana_inicio || 0 // Por defecto Semana 1 (0)
+
+      if (semanaActual !== semanaInicio) {
+        return res.json({
+          disponible: false,
+          mensaje: `El profesional no atiende este ${diaSemana} (corresponde a la otra quincena)`,
+          horarios_disponibles: [],
+        })
+      }
     }
 
     // Generar slots de tiempo cada 30 minutos para cada rango
@@ -642,6 +674,32 @@ const actualizarComision = async (req, res) => {
   }
 }
 
+const subirFoto = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No se ha proporcionado ninguna imagen" })
+    }
+
+    const profesional = await Profesional.findByPk(id)
+    if (!profesional) {
+      return res.status(404).json({ error: "Profesional no encontrado" })
+    }
+
+    // Actualizar la URL en la base de datos
+    await profesional.update({ foto_url: req.file.path })
+
+    res.json({
+      mensaje: "Foto actualizada correctamente",
+      foto_url: req.file.path,
+    })
+  } catch (error) {
+    console.error("Error al subir foto:", error)
+    res.status(500).json({ error: "Error al procesar la subida de imagen" })
+  }
+}
+
 module.exports = {
   listarProfesionales,
   crearProfesional,
@@ -654,5 +712,6 @@ module.exports = {
   obtenerServiciosProfesional,
   asignarServicioAProfesional,
   removerServicioDeProfesional,
-  actualizarComision, // Exportando nueva función
+  actualizarComision,
+  subirFoto,
 }

@@ -1,0 +1,28 @@
+{
+  "2026-05-12": [
+    { "time": "10:00", "patientName": "Chirino Lautaro Ezequiel" },
+    { "time": "12:30", "patientName": "SPAGNA SERGIO" },
+    { "time": "14:00", "patientName": "FORZISI TAMARA" },
+    { "time": "16:00", "patientName": "PERALTA ELIAS GUSTAVO" },
+    { "time": "17:00", "patientName": "MORENO FABIAN" },
+    { "time": "17:30", "patientName": "MORENO LUCA" }
+  ],
+  "2026-05-13": [
+    { "time": "08:00", "patientName": "Diaz Maria Fernanda" },
+    { "time": "09:00", "patientName": "Carrion Jose Luis" },
+    { "time": "09:30", "patientName": "ROJAS LILIANA BEATRIZ" }
+  ],
+  "2026-05-14": [
+    { "time": "10:30", "patientName": "PALMA LEON" },
+    { "time": "11:00", "patientName": "Steierd Talia Florencia" },
+    { "time": "11:00", "patientName": "Vallejos Facundo Maximo" },
+    { "time": "17:30", "patientName": "SANCHEZ MAXIMILIANO" }
+  ],
+  "2026-05-19": [
+    { "time": "17:30", "patientName": "Quintela Dana Estefania" },
+    { "time": "18:00", "patientName": "Martinez Jorge" }
+  ],
+  "2026-05-22": [
+    { "time": "14:30", "patientName": "Romero Norberto Cesar" }
+  ]
+}

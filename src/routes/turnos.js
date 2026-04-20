@@ -48,6 +48,7 @@ const validacionActualizarTurno = [
 router.get("/", turnoController.listarTurnos)
 router.post("/", validacionCrearTurno, turnoController.crearTurno)
 router.get("/mis-turnos", turnoController.misTurnos)
+router.put("/confirmar-todos-pendientes", turnoController.confirmarTodosPendientes)
 router.get("/:id", turnoController.obtenerTurno)
 router.put("/:id", validacionActualizarTurno, turnoController.actualizarTurno)
 router.put("/:id/confirmar-pago", turnoController.confirmarPago)

@@ -250,7 +250,7 @@ const obtenerProfesionalesServicio = async (req, res) => {
             attributes: ["estado", "createdAt"],
             where: { estado: "Activo" },
           },
-          attributes: ["id", "nombre", "apellido", "especialidad", "telefono", "email", "estado"],
+          attributes: ["id", "nombre", "apellido", "especialidad", "telefono", "email", "estado", "foto_url", "color"],
         },
       ],
     })

@@ -1,0 +1,33 @@
+{
+  "2026-04-20": [
+    { "time": "10:00", "patientName": "LOPEZ MARIANO" },
+    { "time": "10:30", "patientName": "GONZALEZ BARBARA" },
+    { "time": "11:00", "patientName": "Lescano Nazarena Edith" },
+    { "time": "11:30", "patientName": "GOMEZ NATALIA" },
+    { "time": "12:00", "patientName": "Zanchetta Bruno Alejandro" },
+    { "time": "12:30", "patientName": "Wagner Cicero Ianina Sol" },
+    { "time": "14:00", "patientName": "Miguel Debora Solange" },
+    { "time": "14:30", "patientName": "Toledo Bastian Jonas" },
+    { "time": "15:00", "patientName": "Valle Mariana Del" },
+    { "time": "15:00", "patientName": "Vallejos Matias Daniel" },
+    { "time": "15:30", "patientName": "Valentino Lucas Wendler" },
+    { "time": "15:30", "patientName": "ZALAZAR DIEGO RAUL" },
+    { "time": "16:00", "patientName": "Pampin Daiana Pamela" },
+    { "time": "16:30", "patientName": "Nuñez Cristian Alejandro" },
+    { "time": "17:00", "patientName": "Colman Nicole Macarena" },
+    { "time": "17:30", "patientName": "Aquino Emiliano Alejandro" },
+    { "time": "17:30", "patientName": "Condori Adrian Dario" },
+    { "time": "18:00", "patientName": "Tuchscherer Iglesias Mateo" },
+    { "time": "18:30", "patientName": "Gutirrez MEDRANO JOAQUIN" }
+  ],
+  "2026-04-27": [
+    { "time": "11:00", "patientName": "Cardozo Pablo Adrian" },
+    { "time": "12:00", "patientName": "Galeano Matias Ismael" },
+    { "time": "15:00", "patientName": "ESCOBAR JORDANA AILEN" },
+    { "time": "15:30", "patientName": "Nievas Nievas Martina" },
+    { "time": "16:00", "patientName": "SILVA GONZALEZ GIAN" },
+    { "time": "16:30", "patientName": "SILVA GONZALEZ TIAGO" },
+    { "time": "17:00", "patientName": "Apaza Sabina Milagro" },
+    { "time": "17:30", "patientName": "Gonzalez Claudia Betina" }
+  ]
+}

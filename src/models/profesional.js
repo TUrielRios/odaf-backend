@@ -76,6 +76,11 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: "#026498",
         comment: "Color identificativo del profesional en el calendario",
       },
+      foto_url: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        comment: "URL de la foto de perfil del profesional (Cloudinary)",
+      },
     },
     {
       tableName: "profesionales",

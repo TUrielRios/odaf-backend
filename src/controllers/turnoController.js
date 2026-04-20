@@ -702,6 +702,64 @@ const reprogramarTurno = async (req, res) => {
   }
 }
 
+const confirmarTodosPendientes = async (req, res) => {
+  try {
+    const turnosPendientes = await Turno.findAll({
+      where: { estado: "Pendiente" },
+    })
+
+    if (turnosPendientes.length === 0) {
+      return res.json({ message: "No hay turnos pendientes para confirmar", count: 0 })
+    }
+
+    // Actualizar estados
+    await Turno.update(
+      { estado: "Confirmado" },
+      { where: { estado: "Pendiente" } }
+    )
+
+    // Crear prestaciones para los turnos confirmados
+    for (const turno of turnosPendientes) {
+      const existingPrestacion = await Prestacion.findOne({
+        where: { turno_id: turno.id }
+      })
+
+      if (!existingPrestacion) {
+        const profesional = await Profesional.findByPk(turno.profesional_id)
+        const servicio = await Servicio.findByPk(turno.servicio_id)
+        const subservicio = turno.subservicio_id ? await SubServicio.findByPk(turno.subservicio_id) : null
+
+        const montoTotal = (turno.precio_final !== null && turno.precio_final !== undefined)
+          ? turno.precio_final
+          : (subservicio ? subservicio.precio : servicio.precio_base)
+
+        const porcentaje = profesional.porcentaje_comision || 50
+
+        await Prestacion.create({
+          turno_id: turno.id,
+          profesional_id: turno.profesional_id,
+          paciente_id: turno.paciente_id,
+          servicio_id: turno.servicio_id,
+          subservicio_id: turno.subservicio_id,
+          fecha: turno.fecha,
+          monto_total: montoTotal,
+          porcentaje_profesional: porcentaje,
+          monto_profesional: (montoTotal * porcentaje) / 100,
+          estado: "Pendiente"
+        })
+      }
+    }
+
+    res.json({
+      message: `${turnosPendientes.length} turnos confirmados correctamente`,
+      count: turnosPendientes.length
+    })
+  } catch (error) {
+    console.error("Error al confirmar turnos en masa:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+}
+
 module.exports = {
   listarTurnos,
   crearTurno,
@@ -713,4 +771,5 @@ module.exports = {
   misTurnos,
   cancelarTurno,
   reprogramarTurno,
+  confirmarTodosPendientes,
 }

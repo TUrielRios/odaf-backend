@@ -2,6 +2,7 @@ const express = require("express")
 const { body } = require("express-validator")
 const profesionalController = require("../controllers/profesionalController")
 const authMiddleware = require("../middlewares/auth")
+const { upload } = require("../services/imageService")
 
 const router = express.Router()
 
@@ -66,5 +67,8 @@ router.post("/:id/servicios", profesionalController.asignarServicioAProfesional)
 router.delete("/:id/servicios/:servicio_id", profesionalController.removerServicioDeProfesional)
 
 router.put("/:id/comision", validacionActualizarComision, profesionalController.actualizarComision)
+
+// Ruta para subir foto
+router.post("/:id/foto", upload.single("foto"), profesionalController.subirFoto)
 
 module.exports = router
