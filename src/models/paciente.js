@@ -92,6 +92,12 @@ module.exports = (sequelize, DataTypes) => {
           len: [0, 50],
         },
       },
+      numero_afiliado: {
+        type: DataTypes.STRING,
+      },
+      condicion_iva: {
+        type: DataTypes.STRING,
+      },
       informacion_adicional: {
         type: DataTypes.TEXT,
       },
