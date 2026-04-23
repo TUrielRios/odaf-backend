@@ -264,6 +264,35 @@ const buscarPorDocumento = async (req, res) => {
   }
 }
 
+const subirFotoPaciente = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const paciente = await Paciente.findByPk(id)
+    if (!paciente) {
+      return res.status(404).json({ error: "Paciente no encontrado" })
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: "No se proporcionó una imagen" })
+    }
+
+    // Use the Cloudinary URL if available, otherwise use local path
+    const foto_url = req.file.path || req.file.location
+
+    await Paciente.update({ foto_url }, { where: { id } })
+
+    const pacienteActualizado = await Paciente.findByPk(id, {
+      include: [{ model: ObraSocial, as: "obraSocial" }],
+    })
+
+    res.json(pacienteActualizado)
+  } catch (error) {
+    console.error("Error al subir foto del paciente:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+}
+
 module.exports = {
   listarPacientes,
   crearPaciente,
@@ -271,4 +300,5 @@ module.exports = {
   actualizarPaciente,
   eliminarPaciente,
   buscarPorDocumento,
+  subirFotoPaciente,
 }

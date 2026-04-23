@@ -7,10 +7,41 @@ const {
   actualizarPaciente,
   eliminarPaciente,
   buscarPorDocumento,
+  subirFotoPaciente,
 } = require("../controllers/pacienteController")
 const auth = require("../middlewares/auth")
+const multer = require("multer")
 
 const router = express.Router()
+
+// Configuración de multer para fotos de pacientes
+const fotoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const fs = require("fs")
+    const path = require("path")
+    const uploadPath = path.join(__dirname, "../uploads/fotos-pacientes")
+    fs.mkdirSync(uploadPath, { recursive: true })
+    cb(null, uploadPath)
+  },
+  filename: (req, file, cb) => {
+    const path = require("path")
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9)
+    cb(null, "foto-" + uniqueSuffix + path.extname(file.originalname))
+  },
+})
+const fotoUpload = multer({
+  storage: fotoStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/
+    const path = require("path")
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase())
+    if (extname) {
+      return cb(null, true)
+    }
+    cb(new Error("Solo se permiten imágenes (jpeg, jpg, png, gif, webp)"))
+  },
+})
 
 // Validaciones para paciente
 const pacienteValidation = [
@@ -32,6 +63,7 @@ router.post("/", pacienteValidation, crearPaciente)
 router.get("/documento/:numero_documento", buscarPorDocumento)
 router.get("/:id", obtenerPaciente)
 router.put("/:id", pacienteValidation, actualizarPaciente)
+router.put("/:id/foto", fotoUpload.single("foto"), subirFotoPaciente)
 router.delete("/:id", eliminarPaciente)
 
 module.exports = router

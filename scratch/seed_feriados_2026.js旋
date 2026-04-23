@@ -1,0 +1,47 @@
+const { Feriado } = require("../src/models")
+
+const feriados = [
+  { fecha: "2026-01-01", descripcion: "Año Nuevo" },
+  { fecha: "2026-02-16", descripcion: "Carnaval" },
+  { fecha: "2026-02-17", descripcion: "Carnaval" },
+  { fecha: "2026-03-23", descripcion: "Feriado puente turístico" },
+  { fecha: "2026-03-24", descripcion: "Día de la Memoria" },
+  { fecha: "2026-04-02", descripcion: "Día del Veterano y de los Caídos en Malvinas" },
+  { fecha: "2026-04-03", descripcion: "Viernes Santo" },
+  { fecha: "2026-05-01", descripcion: "Día del Trabajador" },
+  { fecha: "2026-05-25", descripcion: "Día de la Revolución de Mayo" },
+  { fecha: "2026-06-15", descripcion: "Paso a la Inmortalidad de Güemes (trasladado)" },
+  { fecha: "2026-06-20", descripcion: "Paso a la Inmortalidad de Belgrano" },
+  { fecha: "2026-07-09", descripcion: "Día de la Independencia" },
+  { fecha: "2026-07-10", descripcion: "Feriado puente turístico" },
+  { fecha: "2026-08-17", descripcion: "Paso a la Inmortalidad de San Martín" },
+  { fecha: "2026-10-12", descripcion: "Día del Respeto a la Diversidad Cultural" },
+  { fecha: "2026-11-23", descripcion: "Día de la Soberanía Nacional (trasladado)" },
+  { fecha: "2026-12-07", descripcion: "Feriado puente turístico" },
+  { fecha: "2026-12-08", descripcion: "Inmaculada Concepción" },
+  { fecha: "2026-12-25", descripcion: "Navidad" },
+]
+
+async function seed() {
+  console.log(`Iniciando carga de ${feriados.length} feriados nacionales...`)
+  
+  for (const f of feriados) {
+    try {
+      const [feriado, created] = await Feriado.findOrCreate({
+        where: { fecha: f.fecha },
+        defaults: { descripcion: f.descripcion }
+      })
+      if (created) {
+        console.log(`Creado: ${f.fecha} - ${f.descripcion}`)
+      } else {
+        console.log(`Ya existe: ${f.fecha}`)
+      }
+    } catch (e) {
+      console.error(`Error cargando ${f.fecha}:`, e.message)
+    }
+  }
+  
+  console.log("Carga de feriados finalizada.")
+}
+
+seed()

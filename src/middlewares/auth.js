@@ -12,8 +12,12 @@ const auth = (req, res, next) => {
     req.user = decoded
     next()
   } catch (error) {
-    console.error("Error de autenticación:", error)
-    res.status(401).json({ error: "Token inválido" })
+    if (error.name === "TokenExpiredError") {
+      console.warn("Token de acceso expirado")
+    } else {
+      console.error("Error de autenticación:", error.message)
+    }
+    res.status(401).json({ error: "Token inválido o expirado" })
   }
 }
 

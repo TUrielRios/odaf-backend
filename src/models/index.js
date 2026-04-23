@@ -34,6 +34,7 @@ const Liquidacion = require("./liquidacion")(sequelize, Sequelize.DataTypes)
 const Copago = require("./copago")(sequelize, Sequelize.DataTypes)
 const MovimientoCuenta = require("./movimientoCuenta")(sequelize, Sequelize.DataTypes)
 const UsuarioPaciente = require("./usuarioPaciente")(sequelize, Sequelize.DataTypes)
+const Feriado = require("./feriado")(sequelize, Sequelize.DataTypes)
 
 // Definir asociaciones
 const models = {
@@ -55,6 +56,7 @@ const models = {
   Copago,
   MovimientoCuenta,
   UsuarioPaciente,
+  Feriado,
 }
 
 console.log("[v0] Configurando asociaciones...")

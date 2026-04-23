@@ -98,6 +98,9 @@ module.exports = (sequelize, DataTypes) => {
       condicion_iva: {
         type: DataTypes.STRING,
       },
+      foto_url: {
+        type: DataTypes.STRING,
+      },
       informacion_adicional: {
         type: DataTypes.TEXT,
       },

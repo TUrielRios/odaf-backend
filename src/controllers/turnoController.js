@@ -1,4 +1,4 @@
-const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio, Prestacion, UsuarioPaciente } = require("../models")
+const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio, Prestacion, UsuarioPaciente, Feriado } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
 const jwt = require("jsonwebtoken")
@@ -91,6 +91,12 @@ const crearTurno = async (req, res) => {
     const errors = validationResult(req)
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() })
+    }
+
+    // Verificar si la fecha es feriado
+    const feriado = await Feriado.findOne({ where: { fecha: req.body.fecha } })
+    if (feriado) {
+      return res.status(400).json({ error: `No se pueden crear turnos el día ${req.body.fecha} (Feriado: ${feriado.descripcion})` })
     }
 
     if (req.body.servicio_id && req.body.profesional_id) {
@@ -391,6 +397,15 @@ const verificarDisponibilidad = async (req, res) => {
     if (!profesional_id || !fecha || !hora_inicio || !hora_fin) {
       return res.status(400).json({
         error: "Faltan parámetros requeridos: profesional_id, fecha, hora_inicio, hora_fin",
+      })
+    }
+
+    // Verificar si el día es feriado
+    const feriado = await Feriado.findOne({ where: { fecha } })
+    if (feriado) {
+      return res.json({
+        disponible: false,
+        mensaje: `El día seleccionado es feriado: ${feriado.descripcion}`,
       })
     }
 

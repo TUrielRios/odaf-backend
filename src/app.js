@@ -45,6 +45,7 @@ app.use(express.urlencoded({ extended: true }))
 
 // Servir archivos estáticos
 app.use("/uploads", express.static("src/uploads"))
+app.use("/uploads/fotos-pacientes", express.static("src/uploads/fotos-pacientes"))
 
 // Rutas de la API
 app.use("/api/auth", authRoutes)
@@ -63,6 +64,8 @@ app.use("/api/liquidaciones", liquidacionRoutes)
 app.use("/api/obras-sociales", require("./routes/obras-sociales"))
 app.use("/api/copagos", require("./routes/copagos"))
 app.use("/api/cuenta-corriente", require("./routes/cuentaCorriente"))
+app.use("/api/feriados", require("./routes/feriados"))
+app.use("/api/recordatorios", require("./routes/recordatorios"))
 
 app.use("/auth", authRoutes)
 app.use("/pacientes", pacienteRoutes)
@@ -80,6 +83,8 @@ app.use("/liquidaciones", liquidacionRoutes)
 app.use("/obras-sociales", require("./routes/obras-sociales"))
 app.use("/copagos", require("./routes/copagos"))
 app.use("/cuenta-corriente", require("./routes/cuentaCorriente"))
+app.use("/feriados", require("./routes/feriados"))
+app.use("/recordatorios", require("./routes/recordatorios"))
 
 // WhatsApp routes (Twilio)
 app.use("/api/whatsapp", whatsappRoutes)
