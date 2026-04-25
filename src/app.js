@@ -85,6 +85,8 @@ app.use("/copagos", require("./routes/copagos"))
 app.use("/cuenta-corriente", require("./routes/cuentaCorriente"))
 app.use("/feriados", require("./routes/feriados"))
 app.use("/recordatorios", require("./routes/recordatorios"))
+app.use("/whatsapp", whatsappRoutes)
+app.use("/usuarios-pacientes", usuarioPacienteRoutes)
 
 // WhatsApp routes (Twilio)
 app.use("/api/whatsapp", whatsappRoutes)
