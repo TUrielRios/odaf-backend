@@ -355,6 +355,24 @@ const obtenerHorariosDisponibles = async (req, res) => {
     const diasSemana = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]
     const diaSemana = diasSemana[fechaObj.getDay()]
 
+    // Verificar si el profesional tiene una ausencia que cubra la fecha consultada
+    const { Ausencia } = require("../models");
+    const ausencia = await Ausencia.findOne({
+      where: {
+        profesional_id: id,
+        fecha_inicio: { [Op.lte]: fecha },
+        fecha_fin: { [Op.gte]: fecha }
+      }
+    });
+
+    if (ausencia) {
+      return res.json({
+        disponible: false,
+        mensaje: `El profesional no está disponible: ${ausencia.motivo || 'Ausencia/Vacaciones'}`,
+        horarios_disponibles: [],
+      })
+    }
+
     // Obtener horarios del profesional
     let horarios = profesional.horarios_atencion
     if (!horarios || Object.keys(horarios).length === 0) {

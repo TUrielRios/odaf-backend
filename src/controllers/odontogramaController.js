@@ -49,7 +49,16 @@ const validarDientesData = (dientesData) => {
   const estadosValidos = [
     "sano", "caries", "obturado", "extraido", 
     "ausente", "protesis", "corona", "endodoncia",
-    "fractura", "movilidad"
+    "fractura", "movilidad",
+    "implante", "extraccion", "aparato_ortodontico_fijo",
+    "aparato_ortodontico_removible", "puente", "poste",
+    "tratamiento_endodontico", "perno", "protesis_total_removible",
+    "protesis_parcial_removible", "resto_radicular",
+    "intrusion", "extrusion", "giroversion_antihoraria",
+    "giroversion_horaria", "migracion_derecha", "migracion_izquierda",
+    "incrustacion", "restauracion", "sellador", "carilla",
+    "superficie_desgastada", "diastema", "supernumerario",
+    "buen_estado", "mal_estado"
   ]
   
   const superficiesValidas = ["oclusal", "vestibular", "lingual", "mesial", "distal"]
