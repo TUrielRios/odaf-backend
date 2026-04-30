@@ -5,8 +5,8 @@ const fs = require("fs")
 // Configuración de almacenamiento
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const pacienteId = req.params.id
-    const uploadPath = path.join(__dirname, "../uploads/pacientes", pacienteId)
+    const pacienteId = req.body.paciente_id || req.params.id || "genericos"
+    const uploadPath = path.join(__dirname, "../uploads/pacientes", String(pacienteId))
 
     // Crear directorio si no existe
     fs.mkdirSync(uploadPath, { recursive: true })

@@ -20,7 +20,7 @@ const validacionSubirArchivo = [
 
 // Rutas
 router.get("/", archivoController.listarArchivos)
-router.post("/", upload.single("archivo"), validacionSubirArchivo, archivoController.subirArchivo)
+router.post("/", upload.single("file"), validacionSubirArchivo, archivoController.subirArchivo)
 router.get("/:id", archivoController.obtenerArchivo)
 router.get("/:id/descargar", archivoController.descargarArchivo)
 router.delete("/:id", archivoController.eliminarArchivo)

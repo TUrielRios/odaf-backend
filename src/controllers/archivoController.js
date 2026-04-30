@@ -35,7 +35,14 @@ const listarArchivos = async (req, res) => {
       order: [["fecha_subida", "DESC"]],
     })
 
-    res.json(archivos)
+    const archivosFormateados = archivos.map((archivo) => ({
+      ...archivo.toJSON(),
+      nombre: archivo.nombre_original,
+      tipo: archivo.tipo_mime,
+      ruta: `/archivos/${archivo.id}/descargar`,
+    }))
+
+    res.json(archivosFormateados)
   } catch (error) {
     console.error("Error al listar archivos:", error)
     res.status(500).json({ error: "Error interno del servidor" })
@@ -82,7 +89,14 @@ const subirArchivo = async (req, res) => {
       ],
     })
 
-    res.status(201).json(archivoCompleto)
+    const archivoFormateado = {
+      ...archivoCompleto.toJSON(),
+      nombre: archivoCompleto.nombre_original,
+      tipo: archivoCompleto.tipo_mime,
+      ruta: `/archivos/${archivoCompleto.id}/descargar`,
+    }
+
+    res.status(201).json(archivoFormateado)
   } catch (error) {
     console.error("Error al subir archivo:", error)
     res.status(500).json({ error: "Error interno del servidor" })
@@ -110,7 +124,14 @@ const obtenerArchivo = async (req, res) => {
       return res.status(404).json({ error: "Archivo no encontrado" })
     }
 
-    res.json(archivo)
+    const archivoFormateado = {
+      ...archivo.toJSON(),
+      nombre: archivo.nombre_original,
+      tipo: archivo.tipo_mime,
+      ruta: `/archivos/${archivo.id}/descargar`,
+    }
+
+    res.json(archivoFormateado)
   } catch (error) {
     console.error("Error al obtener archivo:", error)
     res.status(500).json({ error: "Error interno del servidor" })

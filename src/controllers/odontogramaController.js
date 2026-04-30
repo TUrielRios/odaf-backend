@@ -5,7 +5,7 @@ const { validationResult } = require("express-validator")
 const inicializarDientesData = () => {
   const dientes = {}
   
-  // Dientes superiores: 1.8 a 2.8
+  // Dientes superiores permanentes: 1.8 a 2.8
   for (let cuadrante = 1; cuadrante <= 2; cuadrante++) {
     for (let diente = 1; diente <= 8; diente++) {
       const key = `${cuadrante}.${diente}`
@@ -23,9 +23,27 @@ const inicializarDientesData = () => {
     }
   }
   
-  // Dientes inferiores: 4.8 a 3.8
+  // Dientes inferiores permanentes: 4.8 a 3.8
   for (let cuadrante = 3; cuadrante <= 4; cuadrante++) {
     for (let diente = 1; diente <= 8; diente++) {
+      const key = `${cuadrante}.${diente}`
+      dientes[key] = {
+        estado: "sano",
+        superficies: {
+          oclusal: "sano",
+          vestibular: "sano",
+          lingual: "sano",
+          mesial: "sano",
+          distal: "sano"
+        },
+        notas: ""
+      }
+    }
+  }
+
+  // Dientes temporarios: 5.5 a 6.5 y 8.5 a 7.5
+  for (let cuadrante = 5; cuadrante <= 8; cuadrante++) {
+    for (let diente = 1; diente <= 5; diente++) {
       const key = `${cuadrante}.${diente}`
       dientes[key] = {
         estado: "sano",
@@ -65,7 +83,9 @@ const validarDientesData = (dientesData) => {
   
   for (const [diente, datos] of Object.entries(dientesData)) {
     // Validar formato de número de diente
-    if (!/^[1-4]\.[1-8]$/.test(diente)) {
+    // Cuadrantes 1-4: dientes 1-8
+    // Cuadrantes 5-8: dientes 1-5
+    if (!/^[1-4]\.[1-8]$|^[5-8]\.[1-5]$/.test(diente)) {
       return { valido: false, mensaje: `Formato de diente inválido: ${diente}` }
     }
     
