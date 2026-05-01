@@ -17,7 +17,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       profesional_id: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true,
         references: {
           model: "profesionales",
           key: "id",
@@ -38,16 +38,26 @@ module.exports = (sequelize, DataTypes) => {
       fecha_inicio: {
         type: DataTypes.DATEONLY,
       },
+      fecha_fin: {
+        type: DataTypes.DATEONLY,
+      },
       fecha_fin_estimada: {
         type: DataTypes.DATEONLY,
       },
+      descripcion: {
+        type: DataTypes.TEXT,
+      },
       tratamientos: {
         type: DataTypes.JSON,
-        allowNull: false,
+        allowNull: true,
         defaultValue: [],
         comment: "Array de tratamientos con detalles, costos, estado",
       },
       costo_total: {
+        type: DataTypes.DECIMAL(10, 2),
+        defaultValue: 0,
+      },
+      costo_estimado: {
         type: DataTypes.DECIMAL(10, 2),
         defaultValue: 0,
       },
@@ -60,8 +70,8 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: 0,
       },
       estado: {
-        type: DataTypes.ENUM("Pendiente", "En_Progreso", "Completado", "Cancelado"),
-        defaultValue: "Pendiente",
+        type: DataTypes.ENUM("Planificado", "Pendiente", "En_Progreso", "Completado", "Cancelado"),
+        defaultValue: "Planificado",
       },
       observaciones: {
         type: DataTypes.TEXT,

@@ -21,11 +21,14 @@ const listarPacientes = async (req, res) => {
     const whereClause = {}
 
     if (search) {
-      whereClause[Op.or] = [
-        { nombre: { [Op.iLike]: `%${search}%` } },
-        { apellido: { [Op.iLike]: `%${search}%` } },
-        { numero_documento: { [Op.iLike]: `%${search}%` } },
-      ]
+      const searchWords = search.split(" ").filter((w) => w.length > 0)
+      whereClause[Op.and] = searchWords.map((word) => ({
+        [Op.or]: [
+          { nombre: { [Op.iLike]: `%${word}%` } },
+          { apellido: { [Op.iLike]: `%${word}%` } },
+          { numero_documento: { [Op.iLike]: `%${word}%` } },
+        ],
+      }))
     }
 
     if (condicion) {

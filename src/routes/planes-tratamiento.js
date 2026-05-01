@@ -11,17 +11,17 @@ const router = express.Router()
 // Validaciones
 const validacionCrearPlan = [
   body("paciente_id").notEmpty().withMessage("El ID del paciente es requerido"),
-  body("profesional_id").isInt().withMessage("El ID del profesional debe ser un número entero"),
-  body("tratamientos").isArray().withMessage("Los tratamientos deben ser un array"),
-  body("costo_total").isDecimal().withMessage("El costo total debe ser un número decimal"),
+  body("descripcion").notEmpty().withMessage("La descripción es requerida"),
+  body("estado")
+    .optional()
+    .isIn(["Planificado", "Pendiente", "En_Progreso", "Completado", "Cancelado"])
+    .withMessage("Estado inválido"),
 ]
 
 const validacionActualizarPlan = [
-  body("tratamientos").optional().isArray().withMessage("Los tratamientos deben ser un array"),
-  body("costo_total").optional().isDecimal().withMessage("El costo total debe ser un número decimal"),
   body("estado")
     .optional()
-    .isIn(["Pendiente", "En_Progreso", "Completado", "Cancelado"])
+    .isIn(["Planificado", "Pendiente", "En_Progreso", "Completado", "Cancelado"])
     .withMessage("Estado inválido"),
 ]
 
