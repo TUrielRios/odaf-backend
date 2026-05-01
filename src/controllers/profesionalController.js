@@ -505,7 +505,31 @@ const obtenerHorariosDisponibles = async (req, res) => {
     }
 
     // Filtrar los slots disponibles
-    const slotsLibres = slotsDisponibles.filter(slot => !isSlotOcupado(slot))
+    let slotsLibres = slotsDisponibles.filter(slot => !isSlotOcupado(slot))
+
+    // REGLA ESPECIAL DRA. GAROFOLO (ID: 7)
+    // Solo permitir turnos PAMI (Martes/Jueves 9-12:30, Miércoles 8-11:30) si es ADMIN
+    if (id == 7 && req.query.isAdmin !== 'true') {
+      const [slotHora, slotMin] = [0, 0] // dummy for logic
+      
+      slotsLibres = slotsLibres.filter(slot => {
+        const [h, m] = slot.split(':').map(Number);
+        const mins = h * 60 + m;
+
+        // Martes y Jueves: 09:00 (540 mins) a 12:30 (750 mins)
+        if ((diaSemana === 'martes' || diaSemana === 'jueves') && mins >= 540 && mins < 750) {
+          return false;
+        }
+
+        // Miércoles: 08:00 (480 mins) a 11:30 (690 mins)
+        if (diaSemana === 'miercoles' && mins >= 480 && mins < 690) {
+          return false;
+        }
+
+        return true;
+      });
+    }
+
     console.log(`[DEBUG] Slots libres después del filtro: ${slotsLibres.length}`)
 
     res.json({
