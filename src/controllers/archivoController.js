@@ -163,6 +163,7 @@ const descargarArchivo = async (req, res) => {
       res.setHeader("Content-Disposition", `attachment; filename="${archivo.nombre_original}"`)
     }
     res.setHeader("Content-Type", archivo.tipo_mime)
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin")
     res.sendFile(rutaCompleta)
   } catch (error) {
     console.error("Error al descargar archivo:", error)
