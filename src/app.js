@@ -30,7 +30,12 @@ app.use(
   }),
 )
 // Middlewares de seguridad
-app.use(helmet())
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    crossOriginEmbedderPolicy: false,
+  }),
+)
 
 // Rate limiting
 const limiter = rateLimit({

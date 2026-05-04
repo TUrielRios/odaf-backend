@@ -141,6 +141,7 @@ const obtenerArchivo = async (req, res) => {
 const descargarArchivo = async (req, res) => {
   try {
     const { id } = req.params
+    const { inline } = req.query
 
     const archivo = await Archivo.findByPk(id)
 
@@ -156,7 +157,11 @@ const descargarArchivo = async (req, res) => {
       return res.status(404).json({ error: "Archivo físico no encontrado" })
     }
 
-    res.setHeader("Content-Disposition", `attachment; filename="${archivo.nombre_original}"`)
+    if (inline === 'true') {
+      res.setHeader("Content-Disposition", `inline; filename="${archivo.nombre_original}"`)
+    } else {
+      res.setHeader("Content-Disposition", `attachment; filename="${archivo.nombre_original}"`)
+    }
     res.setHeader("Content-Type", archivo.tipo_mime)
     res.sendFile(rutaCompleta)
   } catch (error) {
