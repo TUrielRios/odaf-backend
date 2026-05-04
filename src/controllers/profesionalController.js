@@ -355,9 +355,9 @@ const obtenerHorariosDisponibles = async (req, res) => {
     const diasSemana = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"]
     const diaSemana = diasSemana[fechaObj.getDay()]
 
-    // Verificar si el profesional tiene una ausencia que cubra la fecha consultada
+    // Verificar si el profesional tiene ausencias que cubran la fecha consultada
     const { Ausencia } = require("../models");
-    const ausencia = await Ausencia.findOne({
+    const ausencias = await Ausencia.findAll({
       where: {
         profesional_id: id,
         fecha_inicio: { [Op.lte]: fecha },
@@ -365,13 +365,18 @@ const obtenerHorariosDisponibles = async (req, res) => {
       }
     });
 
-    if (ausencia) {
+    // Si hay una ausencia de día completo (sin horarios), el profesional no está disponible
+    const ausenciaDiaCompleto = ausencias.find(a => !a.hora_inicio && !a.hora_fin);
+    if (ausenciaDiaCompleto) {
       return res.json({
         disponible: false,
-        mensaje: `El profesional no está disponible: ${ausencia.motivo || 'Ausencia/Vacaciones'}`,
+        mensaje: `El profesional no está disponible: ${ausenciaDiaCompleto.motivo || 'Ausencia/Vacaciones'}`,
         horarios_disponibles: [],
       })
     }
+
+    // Guardar ausencias parciales para filtrar slots después
+    const ausenciasParciales = ausencias.filter(a => a.hora_inicio && a.hora_fin);
 
     // Obtener horarios del profesional
     let horarios = profesional.horarios_atencion
@@ -479,7 +484,24 @@ const obtenerHorariosDisponibles = async (req, res) => {
       const slotInicioMinutos = slotHora * 60 + slotMin
       const slotFinMinutos = slotInicioMinutos + 30 // Asumimos slots de 30 minutos
 
-      // Verificar si este slot se superpone con algún turno existente
+      // 1. Verificar si este slot está dentro de una ausencia parcial
+      for (const aus of ausenciasParciales) {
+        const [ausInicioHora, ausInicioMin] = aus.hora_inicio.split(":").map(Number)
+        const [ausFinHora, ausFinMin] = aus.hora_fin.split(":").map(Number)
+        
+        const ausInicioMinutos = ausInicioHora * 60 + ausInicioMin
+        const ausFinMinutos = ausFinHora * 60 + ausFinMin
+
+        if (
+          (slotInicioMinutos >= ausInicioMinutos && slotInicioMinutos < ausFinMinutos) ||
+          (slotFinMinutos > ausInicioMinutos && slotFinMinutos <= ausFinMinutos)
+        ) {
+          console.log(`[DEBUG] Slot ${slot} está ocupado por ausencia parcial ${aus.hora_inicio}-${aus.hora_fin}`)
+          return true
+        }
+      }
+
+      // 2. Verificar si este slot se superpone con algún turno existente
       for (const turno of turnosExistentes) {
         const [turnoInicioHora, turnoInicioMin, turnoInicioSeg] = turno.hora_inicio.split(":").map(Number)
         const [turnoFinHora, turnoFinMin, turnoFinSeg] = turno.hora_fin.split(":").map(Number)
@@ -488,10 +510,6 @@ const obtenerHorariosDisponibles = async (req, res) => {
         const turnoFinMinutos = turnoFinHora * 60 + turnoFinMin
 
         // Verificar superposición:
-        // Un slot está ocupado si:
-        // 1. El slot comienza durante un turno existente
-        // 2. El slot termina durante un turno existente
-        // 3. El slot contiene completamente el turno existente
         if (
           (slotInicioMinutos >= turnoInicioMinutos && slotInicioMinutos < turnoFinMinutos) ||
           (slotFinMinutos > turnoInicioMinutos && slotFinMinutos <= turnoFinMinutos) ||

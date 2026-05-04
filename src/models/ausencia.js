@@ -19,6 +19,14 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATEONLY,
         allowNull: false,
       },
+      hora_inicio: {
+        type: DataTypes.TIME,
+        allowNull: true,
+      },
+      hora_fin: {
+        type: DataTypes.TIME,
+        allowNull: true,
+      },
       motivo: {
         type: DataTypes.STRING,
         allowNull: true,

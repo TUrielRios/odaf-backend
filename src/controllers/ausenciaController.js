@@ -21,7 +21,7 @@ const listarAusencias = async (req, res) => {
 
 const crearAusencia = async (req, res) => {
   try {
-    const { profesional_id, fecha_inicio, fecha_fin, motivo } = req.body
+    const { profesional_id, fecha_inicio, fecha_fin, hora_inicio, hora_fin, motivo } = req.body
 
     if (!profesional_id || !fecha_inicio || !fecha_fin) {
       return res.status(400).json({ error: "Faltan datos obligatorios (profesional_id, fecha_inicio, fecha_fin)" })
@@ -31,6 +31,8 @@ const crearAusencia = async (req, res) => {
       profesional_id,
       fecha_inicio,
       fecha_fin,
+      hora_inicio,
+      hora_fin,
       motivo
     })
 
