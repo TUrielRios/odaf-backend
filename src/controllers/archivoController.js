@@ -1,7 +1,7 @@
 const { Archivo, Paciente, Profesional } = require("../models")
 const { validationResult } = require("express-validator")
-const multer = require("multer")
 const path = require("path")
+const { cloudinary } = require("../services/fileService")
 const fs = require("fs").promises
 
 const listarArchivos = async (req, res) => {
@@ -39,7 +39,7 @@ const listarArchivos = async (req, res) => {
       ...archivo.toJSON(),
       nombre: archivo.nombre_original,
       tipo: archivo.tipo_mime,
-      ruta: `/archivos/${archivo.id}/descargar`,
+      ruta: archivo.ruta_archivo, // Return the Cloudinary URL directly
     }))
 
     res.json(archivosFormateados)
@@ -93,7 +93,7 @@ const subirArchivo = async (req, res) => {
       ...archivoCompleto.toJSON(),
       nombre: archivoCompleto.nombre_original,
       tipo: archivoCompleto.tipo_mime,
-      ruta: `/archivos/${archivoCompleto.id}/descargar`,
+      ruta: archivoCompleto.ruta_archivo,
     }
 
     res.status(201).json(archivoFormateado)
@@ -128,7 +128,7 @@ const obtenerArchivo = async (req, res) => {
       ...archivo.toJSON(),
       nombre: archivo.nombre_original,
       tipo: archivo.tipo_mime,
-      ruta: `/archivos/${archivo.id}/descargar`,
+      ruta: archivo.ruta_archivo,
     }
 
     res.json(archivoFormateado)
@@ -141,29 +141,21 @@ const obtenerArchivo = async (req, res) => {
 const descargarArchivo = async (req, res) => {
   try {
     const { id } = req.params
-    const { inline } = req.query
-
     const archivo = await Archivo.findByPk(id)
 
     if (!archivo) {
       return res.status(404).json({ error: "Archivo no encontrado" })
     }
 
+    // Si es una URL de Cloudinary, redirigir
+    if (archivo.ruta_archivo.startsWith('http')) {
+      return res.redirect(archivo.ruta_archivo)
+    }
+
     const rutaCompleta = path.resolve(archivo.ruta_archivo)
-
-    try {
-      await fs.access(rutaCompleta)
-    } catch (error) {
-      return res.status(404).json({ error: "Archivo físico no encontrado" })
-    }
-
-    if (inline === 'true') {
-      res.setHeader("Content-Disposition", `inline; filename="${archivo.nombre_original}"`)
-    } else {
-      res.setHeader("Content-Disposition", `attachment; filename="${archivo.nombre_original}"`)
-    }
+    await fs.access(rutaCompleta)
+    res.setHeader("Content-Disposition", `attachment; filename="${archivo.nombre_original}"`)
     res.setHeader("Content-Type", archivo.tipo_mime)
-    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin")
     res.sendFile(rutaCompleta)
   } catch (error) {
     console.error("Error al descargar archivo:", error)
@@ -181,11 +173,25 @@ const eliminarArchivo = async (req, res) => {
       return res.status(404).json({ error: "Archivo no encontrado" })
     }
 
-    // Eliminar archivo físico
-    try {
-      await fs.unlink(archivo.ruta_archivo)
-    } catch (error) {
-      console.warn("No se pudo eliminar el archivo físico:", error.message)
+    // Eliminar archivo (Cloudinary o Local)
+    if (archivo.ruta_archivo.startsWith('http')) {
+      // Extraer public_id de la URL de Cloudinary
+      // Ejemplo: https://res.cloudinary.com/demo/image/upload/v1234/folder/public_id.jpg
+      const urlParts = archivo.ruta_archivo.split('/');
+      const fileNameWithExtension = urlParts[urlParts.length - 1];
+      const publicIdWithFolder = archivo.ruta_archivo.split('/upload/')[1].split('/').slice(1).join('/').split('.')[0];
+      
+      try {
+        await cloudinary.uploader.destroy(publicIdWithFolder);
+      } catch (error) {
+        console.warn("No se pudo eliminar de Cloudinary:", error.message)
+      }
+    } else {
+      try {
+        await fs.unlink(archivo.ruta_archivo)
+      } catch (error) {
+        console.warn("No se pudo eliminar el archivo físico:", error.message)
+      }
     }
 
     // Eliminar registro de la base de datos

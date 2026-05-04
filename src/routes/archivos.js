@@ -2,7 +2,7 @@ const express = require("express")
 const { body } = require("express-validator")
 const archivoController = require("../controllers/archivoController")
 const authMiddleware = require("../middlewares/auth")
-const upload = require("../config/upload")
+const { upload } = require("../services/fileService")
 
 const router = express.Router()
 

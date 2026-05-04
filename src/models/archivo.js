@@ -32,7 +32,7 @@ module.exports = (sequelize, DataTypes) => {
         unique: true,
       },
       ruta_archivo: {
-        type: DataTypes.STRING,
+        type: DataTypes.TEXT,
         allowNull: false,
       },
       tipo_mime: {

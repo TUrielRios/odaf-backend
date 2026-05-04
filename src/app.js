@@ -1,6 +1,5 @@
 const express = require("express")
 const cors = require("cors")
-const helmet = require("helmet")
 const rateLimit = require("express-rate-limit")
 require("dotenv").config()
 
@@ -29,15 +28,6 @@ app.use(
     credentials: true,
   }),
 )
-// Middlewares de seguridad
-app.use(
-  helmet({
-    crossOriginResourcePolicy: { policy: "cross-origin" },
-    crossOriginEmbedderPolicy: false,
-    crossOriginOpenerPolicy: false,
-  }),
-)
-
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
