@@ -45,7 +45,7 @@ const listarTurnos = async (req, res) => {
         {
           model: Paciente,
           as: "paciente",
-          attributes: ["id", "nombre", "apellido", "numero_documento"],
+          attributes: ["id", "nombre", "apellido", "numero_documento", "email", "telefono"],
         },
         {
           model: Profesional,

@@ -281,9 +281,65 @@ const enviarRecordatorioTurno = async (turnoData, pacienteEmail, customTemplate 
   }
 }
 
+const generarPreviewRecordatorio = (turnoData, customTemplate = null) => {
+  const { paciente, profesional, servicio, fecha, hora_inicio, hora_fin } = turnoData
+
+  let contenidoPersonalizado = ""
+  if (customTemplate) {
+    contenidoPersonalizado = customTemplate
+      .replace(/\{nombre\}/g, paciente.nombre)
+      .replace(/\{apellido\}/g, paciente.apellido)
+      .replace(/\{fecha\}/g, formatearFecha(fecha))
+      .replace(/\{hora_inicio\}/g, hora_inicio)
+      .replace(/\{hora_fin\}/g, hora_fin || "")
+      .replace(/\{profesional\}/g, `${profesional.nombre} ${profesional.apellido}`)
+      .replace(/\{servicio\}/g, servicio.nombre)
+  }
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>${emailStyles}</head>
+<body>
+  <div class="container">
+    <div class="header" style="background-color: #3B82F6;">
+      <h1>Recordatorio de Turno</h1>
+    </div>
+    <div class="content">
+      <p>Hola <strong>${paciente.nombre} ${paciente.apellido}</strong>,</p>
+      ${customTemplate
+        ? `<p>${contenidoPersonalizado}</p>`
+        : `<p>Te recordamos que tenés un turno programado. A continuación, los detalles:</p>`
+      }
+      
+      <div class="info-box" style="border-left-color: #3B82F6;">
+        <div class="info-item"><span class="info-label">Fecha:</span> ${formatearFecha(fecha)}</div>
+        <div class="info-item"><span class="info-label">Horario:</span> ${hora_inicio}${hora_fin ? ` - ${hora_fin}` : ""}</div>
+        <div class="info-item"><span class="info-label">Profesional:</span> ${profesional.nombre} ${profesional.apellido}${profesional.especialidad ? ` - ${profesional.especialidad}` : ""}</div>
+        <div class="info-item"><span class="info-label">Servicio:</span> ${servicio.nombre}</div>
+      </div>
+      
+      <p><strong>Recordatorios:</strong></p>
+      <ul>
+        <li>Por favor, llegá 10 minutos antes de tu turno</li>
+        <li>Si necesitás cancelar, hacelo con al menos 24hs de anticipación</li>
+        <li>Traé tu DNI y credencial de obra social (si corresponde)</li>
+      </ul>
+      
+      <div class="footer">
+        <p>ODAF - Centro Odontológico</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+  `
+}
+
 module.exports = {
   enviarConfirmacionTurno,
   enviarCancelacionTurno,
   enviarReprogramacionTurno,
   enviarRecordatorioTurno,
+  generarPreviewRecordatorio,
 }
