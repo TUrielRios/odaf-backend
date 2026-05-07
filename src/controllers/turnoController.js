@@ -1,4 +1,4 @@
-const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio, Prestacion, UsuarioPaciente, Feriado } = require("../models")
+const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio, Prestacion, UsuarioPaciente, Feriado, Ausencia } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
 const jwt = require("jsonwebtoken")
@@ -133,6 +133,55 @@ const crearTurno = async (req, res) => {
       if (turnoExistente) {
         return res.status(400).json({
           error: "El profesional ya tiene un turno asignado en ese horario",
+        })
+      }
+
+      // Verificar ausencias (normales y recurrentes)
+      const fechaObj = new Date(req.body.fecha + 'T12:00:00');
+      const diaSemana = fechaObj.getDay();
+
+      const ausenciaExistente = await Ausencia.findOne({
+        where: {
+          profesional_id: req.body.profesional_id,
+          [Op.or]: [
+            // Ausencia normal
+            {
+              es_recurrente: false,
+              fecha_inicio: { [Op.lte]: req.body.fecha },
+              fecha_fin: { [Op.gte]: req.body.fecha },
+              [Op.or]: [
+                { hora_inicio: null },
+                {
+                  [Op.and]: [
+                    { hora_inicio: { [Op.lt]: req.body.hora_fin } },
+                    { hora_fin: { [Op.gt]: req.body.hora_inicio } }
+                  ]
+                }
+              ]
+            },
+            // Ausencia recurrente
+            {
+              es_recurrente: true,
+              dia_semana: diaSemana,
+              fecha_inicio: { [Op.lte]: req.body.fecha },
+              fecha_fin: { [Op.gte]: req.body.fecha },
+              [Op.or]: [
+                { hora_inicio: null },
+                {
+                  [Op.and]: [
+                    { hora_inicio: { [Op.lt]: req.body.hora_fin } },
+                    { hora_fin: { [Op.gt]: req.body.hora_inicio } }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      });
+
+      if (ausenciaExistente) {
+        return res.status(400).json({
+          error: `El profesional no está disponible: ${ausenciaExistente.motivo || 'Ausencia/Bloqueo programado'}`
         })
       }
 
@@ -409,8 +458,7 @@ const verificarDisponibilidad = async (req, res) => {
       })
     }
 
-    // Verificar si hay solapamiento de horarios
-    // Dos turnos se solapan si: nuevo_inicio < existente_fin AND nuevo_fin > existente_inicio
+    // Verificar turnos existentes
     const turnoExistente = await Turno.findOne({
       where: {
         profesional_id,
@@ -423,9 +471,64 @@ const verificarDisponibilidad = async (req, res) => {
       },
     })
 
+    if (turnoExistente) {
+      return res.json({
+        disponible: false,
+        mensaje: "El profesional ya tiene un turno asignado en ese horario"
+      })
+    }
+
+    // Verificar ausencias (normales y recurrentes)
+    const fechaObj = new Date(fecha + 'T12:00:00');
+    const diaSemana = fechaObj.getDay();
+
+    const ausenciaExistente = await Ausencia.findOne({
+      where: {
+        profesional_id,
+        [Op.or]: [
+          {
+            es_recurrente: false,
+            fecha_inicio: { [Op.lte]: fecha },
+            fecha_fin: { [Op.gte]: fecha },
+            [Op.or]: [
+              { hora_inicio: null },
+              {
+                [Op.and]: [
+                  { hora_inicio: { [Op.lt]: hora_fin } },
+                  { hora_fin: { [Op.gt]: hora_inicio } }
+                ]
+              }
+            ]
+          },
+          {
+            es_recurrente: true,
+            dia_semana: diaSemana,
+            fecha_inicio: { [Op.lte]: fecha },
+            fecha_fin: { [Op.gte]: fecha },
+            [Op.or]: [
+              { hora_inicio: null },
+              {
+                [Op.and]: [
+                  { hora_inicio: { [Op.lt]: hora_fin } },
+                  { hora_fin: { [Op.gt]: hora_inicio } }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    });
+
+    if (ausenciaExistente) {
+      return res.json({
+        disponible: false,
+        mensaje: `El profesional no está disponible: ${ausenciaExistente.motivo || 'Ausencia programada'}`
+      })
+    }
+
     res.json({
-      disponible: !turnoExistente,
-      mensaje: turnoExistente ? "El profesional ya tiene un turno asignado en ese horario" : "Horario disponible",
+      disponible: true,
+      mensaje: "Horario disponible"
     })
   } catch (error) {
     console.error("Error al verificar disponibilidad:", error)

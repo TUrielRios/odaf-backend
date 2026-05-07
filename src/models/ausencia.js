@@ -31,6 +31,14 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: true,
       },
+      es_recurrente: {
+        type: DataTypes.BOOLEAN,
+        defaultValue: false,
+      },
+      dia_semana: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+      },
     },
     {
       tableName: "ausencias",
