@@ -525,6 +525,36 @@ const obtenerHorariosDisponibles = async (req, res) => {
     // Filtrar los slots disponibles
     let slotsLibres = slotsDisponibles.filter(slot => !isSlotOcupado(slot))
 
+    // Filtrar slots pasados si la fecha es hoy (Zona Horaria Argentina)
+    try {
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      
+      const parts = formatter.formatToParts(now);
+      const d = {};
+      parts.forEach(p => d[p.type] = p.value);
+      
+      const todayStr = `${d.year}-${d.month}-${d.day}`;
+      const currentTimeStr = `${d.hour}:${d.minute}`;
+
+      if (fecha === todayStr) {
+        console.log(`[DEBUG] Fecha es hoy (${todayStr}). Hora actual: ${currentTimeStr}. Filtrando slots pasados.`);
+        const originalCount = slotsLibres.length;
+        slotsLibres = slotsLibres.filter(slot => slot > currentTimeStr);
+        console.log(`[DEBUG] Slots después de filtrar pasados: ${slotsLibres.length} (se eliminaron ${originalCount - slotsLibres.length})`);
+      }
+    } catch (err) {
+      console.error("Error al filtrar slots por hora actual:", err);
+    }
+
     // REGLA ESPECIAL DRA. GAROFOLO (ID: 7)
     // Solo permitir turnos PAMI (Martes/Jueves 9-12:30, Miércoles 8-11:30) si es ADMIN
     if (id == 7 && req.query.isAdmin !== 'true') {
