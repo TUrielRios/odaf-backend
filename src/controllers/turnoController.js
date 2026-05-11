@@ -2,8 +2,8 @@ const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
 const jwt = require("jsonwebtoken")
-const { enviarConfirmacionTurno, enviarCancelacionTurno, enviarReprogramacionTurno } = require("../services/emailService")
-const { enviarConfirmacionTurnoWhatsApp } = require("../services/whatsappNotifications")
+const { enviarConfirmacionTurno, enviarCancelacionTurno, enviarReprogramacionTurno, enviarTurnoPendiente } = require("../services/emailService")
+const { enviarConfirmacionTurnoWhatsApp, enviarTurnoPendienteWhatsApp } = require("../services/whatsappNotifications")
 const bcrypt = require("bcryptjs")
 
 const listarTurnos = async (req, res) => {
@@ -252,39 +252,71 @@ const crearTurno = async (req, res) => {
         console.log("Usuario paciente creado automaticamente para:", turnoCompleto.paciente.email)
       }
 
-      // Enviar email de confirmacion
-      enviarConfirmacionTurno(
-        {
-          paciente: turnoCompleto.paciente,
-          profesional: turnoCompleto.profesional,
-          servicio: turnoCompleto.servicio,
-          fecha: turnoCompleto.fecha,
-          hora_inicio: turnoCompleto.hora_inicio,
-          hora_fin: turnoCompleto.hora_fin,
-          turnoId: turno.id,
-        },
-        turnoCompleto.paciente.email
-      ).catch((error) => {
-        console.error("No se pudo enviar email de confirmacion:", error)
-      })
+      // Enviar email de confirmacion o pendiente
+      if (turnoCompleto.estado === "Pendiente") {
+        enviarTurnoPendiente(
+          {
+            paciente: turnoCompleto.paciente,
+            profesional: turnoCompleto.profesional,
+            servicio: turnoCompleto.servicio,
+            fecha: turnoCompleto.fecha,
+            hora_inicio: turnoCompleto.hora_inicio,
+            hora_fin: turnoCompleto.hora_fin,
+            turnoId: turno.id,
+          },
+          turnoCompleto.paciente.email
+        ).catch((error) => {
+          console.error("No se pudo enviar email de turno pendiente:", error)
+        })
+      } else {
+        enviarConfirmacionTurno(
+          {
+            paciente: turnoCompleto.paciente,
+            profesional: turnoCompleto.profesional,
+            servicio: turnoCompleto.servicio,
+            fecha: turnoCompleto.fecha,
+            hora_inicio: turnoCompleto.hora_inicio,
+            hora_fin: turnoCompleto.hora_fin,
+            turnoId: turno.id,
+          },
+          turnoCompleto.paciente.email
+        ).catch((error) => {
+          console.error("No se pudo enviar email de confirmacion:", error)
+        })
+      }
     }
 
     // Enviar notificación de WhatsApp (no bloqueante)
     if (turnoCompleto.paciente && turnoCompleto.paciente.telefono) {
-      enviarConfirmacionTurnoWhatsApp({
-        telefono: turnoCompleto.paciente.telefono,
-        paciente_nombre: turnoCompleto.paciente.nombre,
-        paciente_apellido: turnoCompleto.paciente.apellido,
-        servicio_nombre: turnoCompleto.servicio.nombre,
-        profesional_nombre: turnoCompleto.profesional.nombre,
-        profesional_apellido: turnoCompleto.profesional.apellido,
-        fecha: turnoCompleto.fecha,
-        hora_inicio: turnoCompleto.hora_inicio,
-        hora_fin: turnoCompleto.hora_fin,
-      }).catch((error) => {
-        console.error("No se pudo enviar WhatsApp de confirmación:", error)
-        // No fallar la creación del turno si el WhatsApp falla
-      })
+      if (turnoCompleto.estado === "Pendiente") {
+        enviarTurnoPendienteWhatsApp({
+          telefono: turnoCompleto.paciente.telefono,
+          paciente_nombre: turnoCompleto.paciente.nombre,
+          paciente_apellido: turnoCompleto.paciente.apellido,
+          servicio_nombre: turnoCompleto.servicio.nombre,
+          profesional_nombre: turnoCompleto.profesional.nombre,
+          profesional_apellido: turnoCompleto.profesional.apellido,
+          fecha: turnoCompleto.fecha,
+          hora_inicio: turnoCompleto.hora_inicio,
+          hora_fin: turnoCompleto.hora_fin,
+        }).catch((error) => {
+          console.error("No se pudo enviar WhatsApp de turno pendiente:", error)
+        })
+      } else {
+        enviarConfirmacionTurnoWhatsApp({
+          telefono: turnoCompleto.paciente.telefono,
+          paciente_nombre: turnoCompleto.paciente.nombre,
+          paciente_apellido: turnoCompleto.paciente.apellido,
+          servicio_nombre: turnoCompleto.servicio.nombre,
+          profesional_nombre: turnoCompleto.profesional.nombre,
+          profesional_apellido: turnoCompleto.profesional.apellido,
+          fecha: turnoCompleto.fecha,
+          hora_inicio: turnoCompleto.hora_inicio,
+          hora_fin: turnoCompleto.hora_fin,
+        }).catch((error) => {
+          console.error("No se pudo enviar WhatsApp de confirmación:", error)
+        })
+      }
     }
 
     res.status(201).json(turnoCompleto)
@@ -585,6 +617,43 @@ const confirmarPago = async (req, res) => {
         })
       }
 
+      // Enviar notificaciones de confirmación al aprobar el pago
+      const turnoCompleto = await Turno.findByPk(id, {
+        include: [
+          { model: Paciente, as: "paciente" },
+          { model: Profesional, as: "profesional" },
+          { model: Servicio, as: "servicio" },
+        ]
+      })
+
+      if (turnoCompleto && turnoCompleto.paciente && turnoCompleto.paciente.email) {
+        enviarConfirmacionTurno(
+          {
+            paciente: turnoCompleto.paciente,
+            profesional: turnoCompleto.profesional,
+            servicio: turnoCompleto.servicio,
+            fecha: turnoCompleto.fecha,
+            hora_inicio: turnoCompleto.hora_inicio,
+            hora_fin: turnoCompleto.hora_fin,
+            turnoId: id,
+          },
+          turnoCompleto.paciente.email
+        ).catch(e => console.error("Error al enviar email post-aprobacion:", e))
+      }
+
+      if (turnoCompleto && turnoCompleto.paciente && turnoCompleto.paciente.telefono) {
+        enviarConfirmacionTurnoWhatsApp({
+          telefono: turnoCompleto.paciente.telefono,
+          paciente_nombre: turnoCompleto.paciente.nombre,
+          paciente_apellido: turnoCompleto.paciente.apellido,
+          servicio_nombre: turnoCompleto.servicio.nombre,
+          profesional_nombre: turnoCompleto.profesional.nombre,
+          profesional_apellido: turnoCompleto.profesional.apellido,
+          fecha: turnoCompleto.fecha,
+          hora_inicio: turnoCompleto.hora_inicio,
+          hora_fin: turnoCompleto.hora_fin,
+        }).catch(e => console.error("Error al enviar WhatsApp post-aprobacion:", e))
+      }
     } else {
       await Turno.update(
         {

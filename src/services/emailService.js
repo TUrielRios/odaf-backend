@@ -100,6 +100,57 @@ const enviarConfirmacionTurno = async (turnoData, pacienteEmail) => {
   }
 }
 
+const enviarTurnoPendiente = async (turnoData, pacienteEmail) => {
+  try {
+    const { paciente, profesional, servicio, fecha, hora_inicio, hora_fin } = turnoData
+
+    const mailOptions = {
+      from: `"ODAF Odontologia" <${process.env.EMAIL_USER}>`,
+      to: pacienteEmail,
+      subject: "Turno Recibido (Pendiente de Aprobación) - ODAF",
+      html: `
+<!DOCTYPE html>
+<html>
+<head>${emailStyles}</head>
+<body>
+  <div class="container">
+    <div class="header reschedule" style="background-color: #F59E0B;">
+      <h1>Turno en Revisión</h1>
+    </div>
+    <div class="content">
+      <p>Hola <strong>${paciente.nombre} ${paciente.apellido}</strong>,</p>
+      <p>Hemos recibido tu solicitud de turno. Tu reserva se encuentra <strong>pendiente de aprobación</strong> hasta que verifiquemos el comprobante de seña.</p>
+      
+      <div class="info-box" style="border-left-color: #F59E0B;">
+        <div class="info-item"><span class="info-label">Fecha:</span> ${formatearFecha(fecha)}</div>
+        <div class="info-item"><span class="info-label">Horario:</span> ${hora_inicio} - ${hora_fin}</div>
+        <div class="info-item"><span class="info-label">Profesional:</span> ${profesional.nombre} ${profesional.apellido}</div>
+        <div class="info-item"><span class="info-label">Servicio:</span> ${servicio.nombre}</div>
+      </div>
+      
+      <p><strong>¿Qué sigue?</strong></p>
+      <p>Una vez que verifiquemos tu pago, recibirás un nuevo correo confirmando definitivamente tu turno. Si aún no enviaste el comprobante, por favor hazlo vía WhatsApp.</p>
+      
+      <div class="footer">
+        <p>Este es un mensaje automático.</p>
+        <p>ODAF - Centro Odontológico</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+      `,
+    }
+
+    const info = await transporter.sendMail(mailOptions)
+    console.log("Email de turno pendiente enviado:", info.messageId)
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    console.error("Error al enviar email de turno pendiente:", error)
+    return { success: false, error: error.message }
+  }
+}
+
 const enviarCancelacionTurno = async (turnoData, pacienteEmail) => {
   try {
     const { paciente, profesional, servicio, fecha, hora_inicio } = turnoData
@@ -341,5 +392,6 @@ module.exports = {
   enviarCancelacionTurno,
   enviarReprogramacionTurno,
   enviarRecordatorioTurno,
+  enviarTurnoPendiente,
   generarPreviewRecordatorio,
 }

@@ -77,6 +77,47 @@ ODAF - Centro Odontológico`;
 };
 
 /**
+ * Send appointment pending approval notification
+ * @param {Object} datos - Appointment data
+ */
+const enviarTurnoPendienteWhatsApp = async (datos) => {
+    const {
+        telefono,
+        paciente_nombre,
+        paciente_apellido,
+        servicio_nombre,
+        profesional_nombre,
+        profesional_apellido,
+        fecha,
+        hora_inicio,
+        hora_fin,
+    } = datos;
+
+    const fechaFormateada = new Date(fecha).toLocaleDateString("es-ES", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+    });
+
+    const mensaje = `⏳ Tu turno está en revisión
+    
+━━━━━━━━━━━━━━━
+👤 Paciente: ${paciente_nombre} ${paciente_apellido}
+🏥 Servicio: ${servicio_nombre}
+👨‍⚕️ Profesional: ${profesional_nombre} ${profesional_apellido}
+📅 Fecha: ${fechaFormateada}
+🕐 Horario: ${hora_inicio} - ${hora_fin}
+━━━━━━━━━━━━━━━
+
+Tu reserva se encuentra PENDIENTE de aprobación hasta verificar el comprobante de seña. Te avisaremos por este medio cuando sea confirmado.
+
+ODAF - Centro Odontológico`;
+
+    return await enviarMensajeWhatsApp(telefono, mensaje);
+};
+
+/**
  * Send appointment reminder notification (24hs before)
  * @param {Object} datos - Appointment data
  */
@@ -170,6 +211,7 @@ const verificarNumeroWhatsApp = async (phoneNumber) => {
 module.exports = {
     enviarMensajeWhatsApp,
     enviarConfirmacionTurnoWhatsApp,
+    enviarTurnoPendienteWhatsApp,
     enviarRecordatorioTurnoWhatsApp,
     enviarCancelacionTurnoWhatsApp,
     verificarNumeroWhatsApp,
