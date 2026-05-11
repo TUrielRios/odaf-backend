@@ -28,7 +28,8 @@ exports.obtenerLiquidaciones = async (req, res) => {
 
     const offset = (page - 1) * limit
 
-    const { count, rows: liquidaciones } = await Liquidacion.findAndCountAll({
+    const count = await Liquidacion.count({ where })
+    const liquidaciones = await Liquidacion.findAll({
       where,
       include: [
         {

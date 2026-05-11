@@ -36,7 +36,8 @@ const listarPrestaciones = async (req, res) => {
       }
     }
 
-    const { count, rows } = await Prestacion.findAndCountAll({
+    const count = await Prestacion.count({ where: whereClause })
+    const rows = await Prestacion.findAll({
       where: whereClause,
       limit: Number.parseInt(limit),
       offset: Number.parseInt(offset),

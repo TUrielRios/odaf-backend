@@ -35,7 +35,8 @@ const listarPacientes = async (req, res) => {
       whereClause.condicion = condicion
     }
 
-    const { count, rows } = await Paciente.findAndCountAll({
+    const count = await Paciente.count({ where: whereClause })
+    const rows = await Paciente.findAll({
       where: whereClause,
       include: [
         {

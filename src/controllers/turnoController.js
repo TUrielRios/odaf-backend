@@ -39,7 +39,8 @@ const listarTurnos = async (req, res) => {
       whereClause.paciente_id = paciente_id
     }
 
-    const { count, rows } = await Turno.findAndCountAll({
+    const count = await Turno.count({ where: whereClause })
+    const rows = await Turno.findAll({
       where: whereClause,
       include: [
         {

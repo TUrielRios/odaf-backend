@@ -24,7 +24,8 @@ const listarProfesionales = async (req, res) => {
       whereClause.estado = estado
     }
 
-    const { count, rows } = await Profesional.findAndCountAll({
+    const count = await Profesional.count({ where: whereClause })
+    const rows = await Profesional.findAll({
       where: whereClause,
       limit: Number.parseInt(limit),
       offset: Number.parseInt(offset),

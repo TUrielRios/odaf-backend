@@ -24,7 +24,19 @@ const listarServicios = async (req, res) => {
       whereClause.categoria = categoria
     }
 
-    const { count, rows } = await Servicio.findAndCountAll({
+    const count = await Servicio.count({
+      where: whereClause,
+      include: [
+        {
+          model: SubServicio,
+          as: "subServicios",
+          where: { estado: "Activo" },
+          required: false,
+        },
+      ]
+    })
+    
+    const rows = await Servicio.findAll({
       where: whereClause,
       include: [
         {
@@ -215,7 +227,8 @@ const obtenerSubservicios = async (req, res) => {
       whereClause.estado = estado
     }
 
-    const { count, rows } = await SubServicio.findAndCountAll({
+    const count = await SubServicio.count({ where: whereClause })
+    const rows = await SubServicio.findAll({
       where: whereClause,
       limit: Number.parseInt(limit),
       offset: Number.parseInt(offset),
