@@ -2,10 +2,6 @@ const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const { validationResult } = require("express-validator")
 
-const ADMIN_EMAIL = "odlanus@gmail.com"
-const ADMIN_PASSWORD = "Benty233"
-const PROFESIONAL_PASSWORD = "Lanus2025"
-
 const login = async (req, res) => {
   try {
     const errors = validationResult(req)
@@ -14,64 +10,36 @@ const login = async (req, res) => {
     }
 
     const { email, password } = req.body
+    const { UsuarioAdmin } = require("../models")
 
-    // Check admin login
-    if (email === ADMIN_EMAIL) {
-      if (password !== ADMIN_PASSWORD) {
-        return res.status(401).json({ error: "Credenciales inválidas" })
-      }
-
-      const token = jwt.sign(
-        {
-          userId: 1,
-          email: ADMIN_EMAIL,
-          role: "admin",
-        },
-        process.env.JWT_SECRET || "dental_clinic_secret",
-        { expiresIn: "24h" },
-      )
-
-      return res.json({
-        token,
-        user: {
-          id: 1,
-          email: ADMIN_EMAIL,
-          nombre: "Administrador",
-          role: "admin",
-        },
-      })
-    }
-
-    // Check professional login
-    const { Profesional } = require("../models")
-    const profesional = await Profesional.findOne({ where: { email } })
-
-    if (!profesional) {
+    const user = await UsuarioAdmin.findOne({ where: { email, activo: true } })
+    if (!user) {
       return res.status(401).json({ error: "Credenciales inválidas" })
     }
 
-    if (password !== PROFESIONAL_PASSWORD) {
+    const isValidPassword = await bcrypt.compare(password, user.password)
+    if (!isValidPassword) {
       return res.status(401).json({ error: "Credenciales inválidas" })
     }
 
     const token = jwt.sign(
       {
-        userId: profesional.id,
-        email: profesional.email,
-        role: "profesional",
-        profesionalId: profesional.id,
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        profesionalId: user.profesional_id || null,
       },
       process.env.JWT_SECRET || "dental_clinic_secret",
       { expiresIn: "24h" },
     )
 
-    return res.json({
+    res.json({
       token,
       user: {
-        id: profesional.id,
-        email: profesional.email,
-        nombre: `${profesional.nombre} ${profesional.apellido}`,
-        role: "profesional",
+        id: user.id,
+        email: user.email,
+        nombre: user.nombre,
+        role: user.role,
       },
     })
   } catch (error) {
@@ -96,28 +64,18 @@ const register = async (req, res) => {
 
 const me = async (req, res) => {
   try {
-    const { role, email, userId } = req.user
+    const { UsuarioAdmin } = require("../models")
+    const user = await UsuarioAdmin.findByPk(req.user.userId)
 
-    if (role === "admin") {
-      return res.json({
-        id: 1,
-        email: ADMIN_EMAIL,
-        nombre: "Administrador",
-        role: "admin",
-      })
-    }
-
-    const { Profesional } = require("../models")
-    const profesional = await Profesional.findByPk(userId)
-    if (!profesional) {
+    if (!user) {
       return res.status(404).json({ error: "Usuario no encontrado" })
     }
 
-    return res.json({
-      id: profesional.id,
-      email: profesional.email,
-      nombre: `${profesional.nombre} ${profesional.apellido}`,
-      role: "profesional",
+    res.json({
+      id: user.id,
+      email: user.email,
+      nombre: user.nombre,
+      role: user.role,
     })
   } catch (error) {
     console.error("Error en me:", error)
