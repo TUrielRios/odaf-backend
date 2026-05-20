@@ -2,16 +2,9 @@ const bcrypt = require("bcryptjs")
 const jwt = require("jsonwebtoken")
 const { validationResult } = require("express-validator")
 
-// Simulamos un modelo de usuario admin (en producción esto debería estar en la BD)
-const adminUsers = [
-  {
-    id: 1,
-    email: "admin@dental.com",
-    password: "$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi", // password
-    role: "admin",
-    nombre: "Administrador",
-  },
-]
+const ADMIN_EMAIL = "odlanus@gmail.com"
+const ADMIN_PASSWORD = "Benty233"
+const PROFESIONAL_PASSWORD = "Lanus2025"
 
 const login = async (req, res) => {
   try {
@@ -22,36 +15,63 @@ const login = async (req, res) => {
 
     const { email, password } = req.body
 
-    // Buscar usuario
-    const user = adminUsers.find((u) => u.email === email)
-    if (!user) {
+    // Check admin login
+    if (email === ADMIN_EMAIL) {
+      if (password !== ADMIN_PASSWORD) {
+        return res.status(401).json({ error: "Credenciales inválidas" })
+      }
+
+      const token = jwt.sign(
+        {
+          userId: 1,
+          email: ADMIN_EMAIL,
+          role: "admin",
+        },
+        process.env.JWT_SECRET || "dental_clinic_secret",
+        { expiresIn: "24h" },
+      )
+
+      return res.json({
+        token,
+        user: {
+          id: 1,
+          email: ADMIN_EMAIL,
+          nombre: "Administrador",
+          role: "admin",
+        },
+      })
+    }
+
+    // Check professional login
+    const { Profesional } = require("../models")
+    const profesional = await Profesional.findOne({ where: { email } })
+
+    if (!profesional) {
       return res.status(401).json({ error: "Credenciales inválidas" })
     }
 
-    // Verificar contraseña
-    const isValidPassword = await bcrypt.compare(password, user.password)
-    if (!isValidPassword) {
+    if (password !== PROFESIONAL_PASSWORD) {
       return res.status(401).json({ error: "Credenciales inválidas" })
     }
 
-    // Generar token
     const token = jwt.sign(
       {
-        userId: user.id,
-        email: user.email,
-        role: user.role,
+        userId: profesional.id,
+        email: profesional.email,
+        role: "profesional",
+        profesionalId: profesional.id,
       },
       process.env.JWT_SECRET || "dental_clinic_secret",
       { expiresIn: "24h" },
     )
 
-    res.json({
+    return res.json({
       token,
       user: {
-        id: user.id,
-        email: user.email,
-        nombre: user.nombre,
-        role: user.role,
+        id: profesional.id,
+        email: profesional.email,
+        nombre: `${profesional.nombre} ${profesional.apellido}`,
+        role: "profesional",
       },
     })
   } catch (error) {
@@ -67,48 +87,7 @@ const register = async (req, res) => {
       return res.status(400).json({ errors: errors.array() })
     }
 
-    const { email, password, nombre } = req.body
-
-    // Verificar si el usuario ya existe
-    const existingUser = adminUsers.find((u) => u.email === email)
-    if (existingUser) {
-      return res.status(400).json({ error: "El usuario ya existe" })
-    }
-
-    // Hash de la contraseña
-    const hashedPassword = await bcrypt.hash(password, 10)
-
-    // Crear nuevo usuario
-    const newUser = {
-      id: adminUsers.length + 1,
-      email,
-      password: hashedPassword,
-      nombre,
-      role: "admin",
-    }
-
-    adminUsers.push(newUser)
-
-    // Generar token
-    const token = jwt.sign(
-      {
-        userId: newUser.id,
-        email: newUser.email,
-        role: newUser.role,
-      },
-      process.env.JWT_SECRET || "dental_clinic_secret",
-      { expiresIn: "24h" },
-    )
-
-    res.status(201).json({
-      token,
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        nombre: newUser.nombre,
-        role: newUser.role,
-      },
-    })
+    return res.status(403).json({ error: "Registro deshabilitado" })
   } catch (error) {
     console.error("Error en registro:", error)
     res.status(500).json({ error: "Error interno del servidor" })
@@ -117,16 +96,28 @@ const register = async (req, res) => {
 
 const me = async (req, res) => {
   try {
-    const user = adminUsers.find((u) => u.id === req.user.userId)
-    if (!user) {
+    const { role, email, userId } = req.user
+
+    if (role === "admin") {
+      return res.json({
+        id: 1,
+        email: ADMIN_EMAIL,
+        nombre: "Administrador",
+        role: "admin",
+      })
+    }
+
+    const { Profesional } = require("../models")
+    const profesional = await Profesional.findByPk(userId)
+    if (!profesional) {
       return res.status(404).json({ error: "Usuario no encontrado" })
     }
 
-    res.json({
-      id: user.id,
-      email: user.email,
-      nombre: user.nombre,
-      role: user.role,
+    return res.json({
+      id: profesional.id,
+      email: profesional.email,
+      nombre: `${profesional.nombre} ${profesional.apellido}`,
+      role: "profesional",
     })
   } catch (error) {
     console.error("Error en me:", error)
