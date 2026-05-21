@@ -36,6 +36,12 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.BOOLEAN,
         defaultValue: true,
       },
+      permisos_tabs: {
+        type: DataTypes.JSON,
+        allowNull: true,
+        defaultValue: null,
+        comment: "Pestañas visibles para el profesional. null = todas las disponibles para su rol",
+      },
     },
     {
       tableName: "usuarios_admin",

@@ -41,6 +41,7 @@ const login = async (req, res) => {
           email: user.email,
           nombre: user.nombre,
           role: user.role,
+          permisos_tabs: user.permisos_tabs || null,
         },
       },
     })
@@ -79,6 +80,7 @@ const me = async (req, res) => {
         email: user.email,
         nombre: user.nombre,
         role: user.role,
+        permisos_tabs: user.permisos_tabs || null,
       },
     })
   } catch (error) {
@@ -87,8 +89,62 @@ const me = async (req, res) => {
   }
 }
 
+const listarUsuarios = async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Acceso denegado" })
+    }
+
+    const { UsuarioAdmin } = require("../models")
+    const usuarios = await UsuarioAdmin.findAll({
+      attributes: ["id", "email", "nombre", "role", "profesional_id", "activo", "permisos_tabs"],
+      order: [["nombre", "ASC"]],
+    })
+
+    res.json({ data: usuarios })
+  } catch (error) {
+    console.error("Error listando usuarios:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+}
+
+const actualizarPermisosTabs = async (req, res) => {
+  try {
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ error: "Acceso denegado" })
+    }
+
+    const { id } = req.params
+    const { permisos_tabs } = req.body
+
+    const { UsuarioAdmin } = require("../models")
+    const usuario = await UsuarioAdmin.findByPk(id)
+
+    if (!usuario) {
+      return res.status(404).json({ error: "Usuario no encontrado" })
+    }
+
+    await usuario.update({ permisos_tabs })
+
+    res.json({
+      data: {
+        id: usuario.id,
+        email: usuario.email,
+        nombre: usuario.nombre,
+        role: usuario.role,
+        permisos_tabs: usuario.permisos_tabs,
+      },
+    })
+  } catch (error) {
+    console.error("Error actualizando permisos:", error)
+    res.status(500).json({ error: "Error interno del servidor" })
+  }
+}
+
 module.exports = {
   login,
   register,
   me,
+  listarUsuarios,
+  actualizarPermisosTabs,
 }
