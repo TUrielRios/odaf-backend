@@ -34,12 +34,14 @@ const login = async (req, res) => {
     )
 
     res.json({
-      token,
-      user: {
-        id: user.id,
-        email: user.email,
-        nombre: user.nombre,
-        role: user.role,
+      data: {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          nombre: user.nombre,
+          role: user.role,
+        },
       },
     })
   } catch (error) {
@@ -72,10 +74,12 @@ const me = async (req, res) => {
     }
 
     res.json({
-      id: user.id,
-      email: user.email,
-      nombre: user.nombre,
-      role: user.role,
+      data: {
+        id: user.id,
+        email: user.email,
+        nombre: user.nombre,
+        role: user.role,
+      },
     })
   } catch (error) {
     console.error("Error en me:", error)
