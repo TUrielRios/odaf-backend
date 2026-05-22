@@ -1,4 +1,4 @@
-const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio, Prestacion, UsuarioPaciente, Feriado, Ausencia } = require("../models")
+const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio, Prestacion, UsuarioPaciente, Feriado, Ausencia, ObraSocial } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
 const jwt = require("jsonwebtoken")
@@ -46,7 +46,14 @@ const listarTurnos = async (req, res) => {
         {
           model: Paciente,
           as: "paciente",
-          attributes: ["id", "nombre", "apellido", "numero_documento", "email", "telefono"],
+          attributes: ["id", "nombre", "apellido", "numero_documento", "email", "telefono", "obra_social_id"],
+          include: [
+            {
+              model: ObraSocial,
+              as: "obraSocial",
+              attributes: ["id", "nombre"],
+            },
+          ],
         },
         {
           model: Profesional,
