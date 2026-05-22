@@ -1,7 +1,7 @@
 const { Archivo, Paciente, Profesional } = require("../models")
 const { validationResult } = require("express-validator")
 const path = require("path")
-const { cloudinary } = require("../services/fileService")
+const { uploadToFirebase, deleteFromFirebase } = require("../utils/firebaseUpload")
 const fs = require("fs").promises
 
 const listarArchivos = async (req, res) => {
@@ -60,12 +60,15 @@ const subirArchivo = async (req, res) => {
       return res.status(400).json({ error: "No se ha subido ningún archivo" })
     }
 
+    const pacienteId = req.body.paciente_id || "unknown"
+    const firebaseUrl = await uploadToFirebase(req.file, `odaf/archivos_pacientes/${pacienteId}`)
+
     const archivoData = {
       paciente_id: req.body.paciente_id,
       profesional_id: req.body.profesional_id || null,
       nombre_original: req.file.originalname,
-      nombre_archivo: req.file.filename,
-      ruta_archivo: req.file.path,
+      nombre_archivo: req.file.originalname,
+      ruta_archivo: firebaseUrl,
       tipo_mime: req.file.mimetype,
       tamaño: req.file.size,
       categoria: req.body.categoria || "Otro",
@@ -173,19 +176,9 @@ const eliminarArchivo = async (req, res) => {
       return res.status(404).json({ error: "Archivo no encontrado" })
     }
 
-    // Eliminar archivo (Cloudinary o Local)
+    // Eliminar archivo de Firebase Storage o local
     if (archivo.ruta_archivo.startsWith('http')) {
-      // Extraer public_id de la URL de Cloudinary
-      // Ejemplo: https://res.cloudinary.com/demo/image/upload/v1234/folder/public_id.jpg
-      const urlParts = archivo.ruta_archivo.split('/');
-      const fileNameWithExtension = urlParts[urlParts.length - 1];
-      const publicIdWithFolder = archivo.ruta_archivo.split('/upload/')[1].split('/').slice(1).join('/').split('.')[0];
-      
-      try {
-        await cloudinary.uploader.destroy(publicIdWithFolder);
-      } catch (error) {
-        console.warn("No se pudo eliminar de Cloudinary:", error.message)
-      }
+      await deleteFromFirebase(archivo.ruta_archivo)
     } else {
       try {
         await fs.unlink(archivo.ruta_archivo)

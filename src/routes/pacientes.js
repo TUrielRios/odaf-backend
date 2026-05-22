@@ -14,34 +14,20 @@ const multer = require("multer")
 
 const router = express.Router()
 
-// Configuración de multer para fotos de pacientes
-const fotoStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const fs = require("fs")
-    const path = require("path")
-    const uploadPath = path.join(__dirname, "../uploads/fotos-pacientes")
-    fs.mkdirSync(uploadPath, { recursive: true })
-    cb(null, uploadPath)
-  },
-  filename: (req, file, cb) => {
-    const path = require("path")
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9)
-    cb(null, "foto-" + uniqueSuffix + path.extname(file.originalname))
-  },
-})
+// Configuración de multer con memoryStorage para Firebase
 const fotoUpload = multer({
-  storage: fotoStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif|webp/
-    const path = require("path")
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase())
-    if (extname) {
-      return cb(null, true)
+    const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true)
+    } else {
+      cb(new Error('Solo se permiten imágenes (jpeg, jpg, png, gif, webp)'))
     }
-    cb(new Error("Solo se permiten imágenes (jpeg, jpg, png, gif, webp)"))
-  },
+  }
 })
+
 
 // Validaciones para paciente
 const pacienteValidation = [

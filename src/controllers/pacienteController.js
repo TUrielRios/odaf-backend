@@ -12,6 +12,7 @@ const {
 } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
+const { uploadToFirebase } = require("../utils/firebaseUpload")
 
 const listarPacientes = async (req, res) => {
   try {
@@ -281,8 +282,7 @@ const subirFotoPaciente = async (req, res) => {
       return res.status(400).json({ error: "No se proporcionó una imagen" })
     }
 
-    // Use the Cloudinary URL if available, otherwise use local path
-    const foto_url = req.file.path || req.file.location
+    const foto_url = await uploadToFirebase(req.file, `odaf/pacientes/${id}`)
 
     await Paciente.update({ foto_url }, { where: { id } })
 

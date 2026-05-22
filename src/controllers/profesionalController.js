@@ -1,7 +1,7 @@
 const { Profesional, ProfesionalServicio, Servicio, Turno } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
-const { cloudinary } = require("../services/imageService")
+const { uploadToFirebase } = require("../utils/firebaseUpload")
 
 const listarProfesionales = async (req, res) => {
   try {
@@ -778,12 +778,14 @@ const subirFoto = async (req, res) => {
       return res.status(404).json({ error: "Profesional no encontrado" })
     }
 
+    const foto_url = await uploadToFirebase(req.file, `odaf/profesionales/${id}`)
+
     // Actualizar la URL en la base de datos
-    await profesional.update({ foto_url: req.file.path })
+    await profesional.update({ foto_url })
 
     res.json({
       mensaje: "Foto actualizada correctamente",
-      foto_url: req.file.path,
+      foto_url,
     })
   } catch (error) {
     console.error("Error al subir foto:", error)
