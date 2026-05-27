@@ -50,18 +50,23 @@ module.exports = (sequelize, DataTypes) => {
       },
       fecha_nacimiento: {
         type: DataTypes.DATEONLY,
-        allowNull: false,
-        validate: {
-          isDate: true,
-          isBefore: new Date().toISOString(),
-        },
+        allowNull: true,
+        set(value) {
+          this.setDataValue('fecha_nacimiento', value === '' ? null : value)
+        }
       },
       sexo: {
         type: DataTypes.ENUM("Masculino", "Femenino", "Otro"),
-        allowNull: false,
+        allowNull: true,
+        set(value) {
+          this.setDataValue('sexo', value === '' ? null : value)
+        }
       },
       direccion: {
         type: DataTypes.STRING,
+        set(value) {
+          this.setDataValue('direccion', value === '' ? null : value)
+        }
       },
       ocupacion: {
         type: DataTypes.STRING,
@@ -82,12 +87,20 @@ module.exports = (sequelize, DataTypes) => {
       },
       email: {
         type: DataTypes.STRING,
+        allowNull: true,
+        set(value) {
+          this.setDataValue('email', value === '' ? null : value)
+        },
         validate: {
           isEmail: true,
         },
       },
       telefono: {
         type: DataTypes.STRING,
+        allowNull: true,
+        set(value) {
+          this.setDataValue('telefono', value === '' ? null : value)
+        },
         validate: {
           len: [0, 50],
         },
