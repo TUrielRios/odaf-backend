@@ -9,6 +9,8 @@ const {
   Turno,
   Prestacion,
   UsuarioPaciente,
+  Presupuesto,
+  Sequelize,
 } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
@@ -16,10 +18,20 @@ const { uploadToFirebase } = require("../utils/firebaseUpload")
 
 const listarPacientes = async (req, res) => {
   try {
-    const { page = 1, limit = 10, search = "", condicion = "" } = req.query
+    const { page = 1, limit = 10, search = "", condicion = "", mes_nacimiento } = req.query
     const offset = (page - 1) * limit
 
     const whereClause = {}
+
+    if (mes_nacimiento) {
+      whereClause[Op.and] = whereClause[Op.and] || []
+      whereClause[Op.and].push(
+        Sequelize.where(
+          Sequelize.fn("date_part", "month", Sequelize.col("fecha_nacimiento")),
+          Number(mes_nacimiento)
+        )
+      )
+    }
 
     if (search) {
       const searchWords = search.split(" ").filter((w) => w.length > 0)
@@ -228,6 +240,7 @@ const eliminarPaciente = async (req, res) => {
     await Archivo.destroy({ where: { paciente_id: id } })
     await Prescripcion.destroy({ where: { paciente_id: id } })
     await UsuarioPaciente.destroy({ where: { paciente_id: id } })
+    await Presupuesto.destroy({ where: { paciente_id: id } })
 
     const deletedRowsCount = await Paciente.destroy({
       where: { id },
