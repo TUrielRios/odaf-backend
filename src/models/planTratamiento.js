@@ -98,6 +98,12 @@ module.exports = (sequelize, DataTypes) => {
       foreignKey: "obra_social_id",
       as: "obraSocial",
     })
+
+    PlanTratamiento.hasMany(models.Tratamiento, {
+      foreignKey: "plan_tratamiento_id",
+      as: "tratamientosItems",
+      onDelete: "CASCADE",
+    })
   }
 
   return PlanTratamiento

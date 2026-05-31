@@ -40,6 +40,7 @@ const Ausencia = require("./ausencia")(sequelize, Sequelize.DataTypes)
 const UsuarioAdmin = require("./usuarioAdmin")(sequelize, Sequelize.DataTypes)
 const Procedimiento = require("./procedimiento")(sequelize, Sequelize.DataTypes)
 const ProcedimientoPrecioObraSocial = require("./procedimientoPrecioObraSocial")(sequelize, Sequelize.DataTypes)
+const Tratamiento = require("./tratamiento")(sequelize, Sequelize.DataTypes)
 
 // Definir asociaciones
 const models = {
@@ -67,6 +68,7 @@ const models = {
   Presupuesto,
   Procedimiento,
   ProcedimientoPrecioObraSocial,
+  Tratamiento,
 }
 
 console.log("[v0] Configurando asociaciones...")

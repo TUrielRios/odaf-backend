@@ -32,4 +32,9 @@ router.get("/:id", planTratamientoController.obtenerPlanTratamiento)
 router.put("/:id", validacionActualizarPlan, planTratamientoController.actualizarPlanTratamiento)
 router.delete("/:id", planTratamientoController.eliminarPlanTratamiento)
 
+// Rutas de tratamientos individuales dentro de un plan
+router.post("/:id/tratamientos", planTratamientoController.agregarTratamiento)
+router.put("/:id/tratamientos/:tratamientoId", planTratamientoController.actualizarTratamiento)
+router.delete("/:id/tratamientos/:tratamientoId", planTratamientoController.eliminarTratamiento)
+
 module.exports = router
