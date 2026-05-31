@@ -243,6 +243,46 @@ const crearTurno = async (req, res) => {
       ],
     })
 
+    // Crear prestación automática si el estado es un estado confirmado/atendido
+    const estadosGeneradoresPrestacion = [
+      "Atendido",
+      "Confirmado",
+      "Confirmado por email",
+      "Confirmado por SMS",
+      "Confirmado por Whatsapp"
+    ];
+
+    if (estadosGeneradoresPrestacion.includes(turnoCompleto.estado)) {
+      const existingPrestacion = await Prestacion.findOne({
+        where: { turno_id: turno.id }
+      })
+
+      if (!existingPrestacion) {
+        const profesional = await Profesional.findByPk(turnoCompleto.profesional_id)
+        const servicio = await Servicio.findByPk(turnoCompleto.servicio_id)
+        const subservicio = turnoCompleto.subservicio_id ? await SubServicio.findByPk(turnoCompleto.subservicio_id) : null
+
+        const montoTotal = (turnoCompleto.precio_final !== null && turnoCompleto.precio_final !== undefined)
+          ? turnoCompleto.precio_final
+          : (subservicio ? subservicio.precio : servicio.precio_base)
+
+        const porcentaje = profesional.porcentaje_comision || 50
+
+        await Prestacion.create({
+          turno_id: turno.id,
+          profesional_id: turnoCompleto.profesional_id,
+          paciente_id: turnoCompleto.paciente_id,
+          servicio_id: turnoCompleto.servicio_id,
+          subservicio_id: turnoCompleto.subservicio_id,
+          fecha: turnoCompleto.fecha,
+          monto_total: montoTotal,
+          porcentaje_profesional: porcentaje,
+          monto_profesional: (montoTotal * porcentaje) / 100,
+          estado: "Pendiente"
+        })
+      }
+    }
+
     // Crear usuario paciente automaticamente si no existe
     if (turnoCompleto.paciente && turnoCompleto.paciente.email && turnoCompleto.paciente.numero_documento) {
       const usuarioExistente = await UsuarioPaciente.findOne({

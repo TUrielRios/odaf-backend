@@ -13,7 +13,14 @@ const transporter = nodemailer.createTransport({
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173"
 
 const formatearFecha = (fecha) => {
-  return new Date(fecha).toLocaleDateString("es-AR", {
+  if (!fecha) return ""
+  let dateStr = fecha
+  if (fecha instanceof Date) {
+    dateStr = fecha.toISOString().split('T')[0]
+  } else if (typeof fecha === 'string' && fecha.includes('T')) {
+    dateStr = fecha.split('T')[0]
+  }
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString("es-AR", {
     weekday: "long",
     year: "numeric",
     month: "long",
@@ -119,7 +126,7 @@ const enviarTurnoPendiente = async (turnoData, pacienteEmail) => {
     </div>
     <div class="content">
       <p>Hola <strong>${paciente.nombre} ${paciente.apellido}</strong>,</p>
-      <p>Hemos recibido tu solicitud de turno. Tu reserva se encuentra <strong>pendiente de aprobación</strong> hasta que verifiquemos el comprobante de seña.</p>
+      <p>Hemos recibido tu solicitud de turno. Tu reserva se encuentra <strong>pendiente de aprobación</strong> por parte de nuestro equipo médico.</p>
       
       <div class="info-box" style="border-left-color: #F59E0B;">
         <div class="info-item"><span class="info-label">Fecha:</span> ${formatearFecha(fecha)}</div>
@@ -129,7 +136,7 @@ const enviarTurnoPendiente = async (turnoData, pacienteEmail) => {
       </div>
       
       <p><strong>¿Qué sigue?</strong></p>
-      <p>Una vez que verifiquemos tu pago, recibirás un nuevo correo confirmando definitivamente tu turno. Si aún no enviaste el comprobante, por favor hazlo vía WhatsApp.</p>
+      <p>Una vez que confirmemos tu disponibilidad en la agenda, recibirás un nuevo correo confirmando definitivamente tu turno con todas las indicaciones necesarias.</p>
       
       <div class="footer">
         <p>Este es un mensaje automático.</p>

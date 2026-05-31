@@ -13,6 +13,22 @@ const client = twilio(
     process.env.TWILIO_AUTH_TOKEN
 );
 
+const formatearFecha = (fecha) => {
+    if (!fecha) return "";
+    let dateStr = fecha;
+    if (fecha instanceof Date) {
+        dateStr = fecha.toISOString().split('T')[0];
+    } else if (typeof fecha === 'string' && fecha.includes('T')) {
+        dateStr = fecha.split('T')[0];
+    }
+    return new Date(dateStr + 'T12:00:00').toLocaleDateString("es-AR", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+    });
+};
+
 /**
  * Send a WhatsApp message notification
  * For Business API, messages must use approved templates or be in response to user messages
@@ -52,12 +68,7 @@ const enviarConfirmacionTurnoWhatsApp = async (datos) => {
         hora_fin,
     } = datos;
 
-    const fechaFormateada = new Date(fecha).toLocaleDateString("es-ES", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    });
+    const fechaFormateada = formatearFecha(fecha);
 
     const mensaje = `✅ ¡Tu turno ha sido confirmado!
 
@@ -93,12 +104,7 @@ const enviarTurnoPendienteWhatsApp = async (datos) => {
         hora_fin,
     } = datos;
 
-    const fechaFormateada = new Date(fecha).toLocaleDateString("es-ES", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    });
+    const fechaFormateada = formatearFecha(fecha);
 
     const mensaje = `⏳ Tu turno está en revisión
     
@@ -110,7 +116,7 @@ const enviarTurnoPendienteWhatsApp = async (datos) => {
 🕐 Horario: ${hora_inicio} - ${hora_fin}
 ━━━━━━━━━━━━━━━
 
-Tu reserva se encuentra PENDIENTE de aprobación hasta verificar el comprobante de seña. Te avisaremos por este medio cuando sea confirmado.
+Tu reserva se encuentra PENDIENTE de aprobación. Te notificaremos por este medio una vez que sea confirmada por nuestro equipo.
 
 ODAF - Centro Odontológico`;
 
@@ -133,12 +139,7 @@ const enviarRecordatorioTurnoWhatsApp = async (datos) => {
         hora_inicio,
     } = datos;
 
-    const fechaFormateada = new Date(fecha).toLocaleDateString("es-ES", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    });
+    const fechaFormateada = formatearFecha(fecha);
 
     const mensaje = `⏰ RECORDATORIO
 
