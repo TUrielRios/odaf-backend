@@ -223,7 +223,14 @@ const crearTurno = async (req, res) => {
         {
           model: Paciente,
           as: "paciente",
-          attributes: ["id", "nombre", "apellido", "numero_documento", "email"],
+          attributes: ["id", "nombre", "apellido", "numero_documento", "email", "telefono", "obra_social_id"],
+          include: [
+            {
+              model: ObraSocial,
+              as: "obraSocial",
+              attributes: ["id", "nombre"],
+            },
+          ],
         },
         {
           model: Profesional,
@@ -382,6 +389,13 @@ const obtenerTurno = async (req, res) => {
         {
           model: Paciente,
           as: "paciente",
+          include: [
+            {
+              model: ObraSocial,
+              as: "obraSocial",
+              attributes: ["id", "nombre"],
+            },
+          ],
         },
         {
           model: Profesional,
@@ -473,7 +487,14 @@ const actualizarTurno = async (req, res) => {
         {
           model: Paciente,
           as: "paciente",
-          attributes: ["id", "nombre", "apellido", "numero_documento"],
+          attributes: ["id", "nombre", "apellido", "numero_documento", "email", "telefono", "obra_social_id"],
+          include: [
+            {
+              model: ObraSocial,
+              as: "obraSocial",
+              attributes: ["id", "nombre"],
+            },
+          ],
         },
         {
           model: Profesional,

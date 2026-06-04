@@ -319,6 +319,84 @@ const actualizarHorariosProfesional = async (req, res) => {
       }
     }
 
+    // Validar estructura de dias_especificos si están presentes
+    if (horarios.dias_especificos !== undefined) {
+      if (typeof horarios.dias_especificos !== "object" || horarios.dias_especificos === null) {
+        return res.status(400).json({
+          error: "El campo 'dias_especificos' debe ser un objeto key-value",
+        })
+      }
+
+      for (const [fecha, horario] of Object.entries(horarios.dias_especificos)) {
+        // Validar formato de fecha (YYYY-MM-DD)
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+          return res.status(400).json({
+            error: `La fecha específica '${fecha}' tiene un formato inválido. Use YYYY-MM-DD`,
+          })
+        }
+
+        if (typeof horario.activo !== "boolean") {
+          return res.status(400).json({
+            error: `La fecha específica ${fecha} debe tener la propiedad 'activo' como boolean`,
+          })
+        }
+
+        if (horario.activo) {
+          if (!horario.rangos || !Array.isArray(horario.rangos) || horario.rangos.length === 0) {
+            return res.status(400).json({
+              error: `La fecha específica ${fecha} debe tener al menos un rango de horario cuando está activa`,
+            })
+          }
+
+          for (let i = 0; i < horario.rangos.length; i++) {
+            const rango = horario.rangos[i]
+
+            if (!rango.inicio || !rango.fin) {
+              return res.status(400).json({
+                error: `La fecha específica ${fecha}, rango ${i + 1}: debe tener horarios de inicio y fin`,
+              })
+            }
+
+            const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/
+            if (!timeRegex.test(rango.inicio) || !timeRegex.test(rango.fin)) {
+              return res.status(400).json({
+                error: `La fecha específica ${fecha}, rango ${i + 1}: formato de hora inválido. Use HH:MM`,
+              })
+            }
+
+            const [inicioHora, inicioMin] = rango.inicio.split(":").map(Number)
+            const [finHora, finMin] = rango.fin.split(":").map(Number)
+            const inicioMinutos = inicioHora * 60 + inicioMin
+            const finMinutos = finHora * 60 + finMin
+
+            if (inicioMinutos >= finMinutos) {
+              return res.status(400).json({
+                error: `La fecha específica ${fecha}, rango ${i + 1}: la hora de inicio debe ser menor que la hora de fin`,
+              })
+            }
+
+            // Validar que los rangos no se superpongan
+            for (let j = i + 1; j < horario.rangos.length; j++) {
+              const otroRango = horario.rangos[j]
+              const [otroInicioHora, otroInicioMin] = otroRango.inicio.split(":").map(Number)
+              const [otroFinHora, otroFinMin] = otroRango.fin.split(":").map(Number)
+              const otroInicioMinutos = otroInicioHora * 60 + otroInicioMin
+              const otroFinMinutos = otroFinHora * 60 + otroFinMin
+
+              if (
+                (inicioMinutos < otroFinMinutos && finMinutos > otroInicioMinutos) ||
+                (otroInicioMinutos < finMinutos && otroFinMinutos > inicioMinutos)
+              ) {
+                return res.status(400).json({
+                  error: `La fecha específica ${fecha}: los rangos ${i + 1} y ${j + 1} se superponen`,
+                })
+              }
+            }
+          }
+        }
+      }
+    }
+
     // Actualizar los horarios
     await Profesional.update({ horarios_atencion: horarios }, { where: { id } })
 
@@ -394,12 +472,22 @@ const obtenerHorariosDisponibles = async (req, res) => {
       }
     }
 
-    const horarioDia = horarios[diaSemana]
+    // Verificar si hay una configuración específica para esta fecha
+    let horarioDia = null
+    let esDiaEspecifico = false
+    if (horarios.dias_especificos && horarios.dias_especificos[fecha]) {
+      horarioDia = horarios.dias_especificos[fecha]
+      esDiaEspecifico = true
+    } else {
+      horarioDia = horarios[diaSemana]
+    }
 
     if (!horarioDia || !horarioDia.activo) {
       return res.json({
         disponible: false,
-        mensaje: `El profesional no atiende los ${diaSemana}s`,
+        mensaje: esDiaEspecifico
+          ? `El profesional no atiende en la fecha ${fecha}`
+          : `El profesional no atiende los ${diaSemana}s`,
         horarios_disponibles: [],
       })
     }
