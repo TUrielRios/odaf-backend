@@ -4,7 +4,7 @@ const { Op } = require("sequelize")
 
 const enviarRecordatorioManual = async (req, res) => {
   try {
-    const { turno_id } = req.body
+    const { turno_id, mensaje_personalizado } = req.body
 
     const turno = await Turno.findByPk(turno_id, {
       include: [
@@ -23,16 +23,18 @@ const enviarRecordatorioManual = async (req, res) => {
     }
 
     // Obtener template personalizado si existe
-    let template = null
-    try {
-      const config = await ConfiguracionSistema.findOne({
-        where: { clave: "recordatorio_email_template" },
-      })
-      if (config) {
-        template = config.valor
+    let template = mensaje_personalizado !== undefined ? mensaje_personalizado : null
+    if (template === null) {
+      try {
+        const config = await ConfiguracionSistema.findOne({
+          where: { clave: "recordatorio_email_template" },
+        })
+        if (config) {
+          template = config.valor
+        }
+      } catch (e) {
+        // Si no existe la config, usar template por defecto
       }
-    } catch (e) {
-      // Si no existe la config, usar template por defecto
     }
 
     const result = await enviarRecordatorioTurno(

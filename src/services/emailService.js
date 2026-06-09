@@ -319,6 +319,15 @@ const enviarRecordatorioTurno = async (turnoData, pacienteEmail, customTemplate 
         <li>Si necesitás cancelar, hacelo con al menos 24hs de anticipación</li>
         <li>Traé tu DNI y credencial de obra social (si corresponde)</li>
       </ul>
+
+      <div style="margin-top: 25px; border-top: 1px solid #E5E7EB; padding-top: 15px;">
+        <p style="margin: 0; font-weight: bold; color: #1E3A8A; font-size: 15px;">¡Te esperamos!</p>
+        <p style="margin: 6px 0 0 0; font-size: 13px; color: #4B5563; line-height: 1.5;">
+          Tel: 7711-5716<br/>
+          Whatsaap 1140483693<br/>
+          2 de Mayo 2930 Lanus Oeste
+        </p>
+      </div>
       
       <div class="footer">
         <p>ODAF - Centro Odontológico</p>
@@ -383,6 +392,15 @@ const generarPreviewRecordatorio = (turnoData, customTemplate = null) => {
         <li>Si necesitás cancelar, hacelo con al menos 24hs de anticipación</li>
         <li>Traé tu DNI y credencial de obra social (si corresponde)</li>
       </ul>
+
+      <div style="margin-top: 25px; border-top: 1px solid #E5E7EB; padding-top: 15px;">
+        <p style="margin: 0; font-weight: bold; color: #1E3A8A; font-size: 15px;">¡Te esperamos!</p>
+        <p style="margin: 6px 0 0 0; font-size: 13px; color: #4B5563; line-height: 1.5;">
+          Tel: 7711-5716<br/>
+          Whatsaap 1140483693<br/>
+          2 de Mayo 2930 Lanus Oeste
+        </p>
+      </div>
       
       <div class="footer">
         <p>ODAF - Centro Odontológico</p>
