@@ -68,6 +68,10 @@ const crearProfesional = async (req, res) => {
       })
     }
 
+    if (error.name === "SequelizeValidationError") {
+      return res.status(400).json({ error: error.errors[0].message })
+    }
+
     res.status(500).json({ error: "Error interno del servidor" })
   }
 }
@@ -115,6 +119,10 @@ const actualizarProfesional = async (req, res) => {
       return res.status(400).json({
         error: "El número de documento o matrícula ya existe",
       })
+    }
+
+    if (error.name === "SequelizeValidationError") {
+      return res.status(400).json({ error: error.errors[0].message })
     }
 
     res.status(500).json({ error: "Error interno del servidor" })

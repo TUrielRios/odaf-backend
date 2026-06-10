@@ -13,16 +13,26 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING,
         allowNull: false,
         validate: {
-          notEmpty: true,
-          len: [2, 100],
+          notEmpty: {
+            msg: "El apellido es requerido",
+          },
+          len: {
+            args: [1, 100],
+            msg: "El apellido debe tener entre 1 y 100 caracteres",
+          },
         },
       },
       nombre: {
         type: DataTypes.STRING,
         allowNull: false,
         validate: {
-          notEmpty: true,
-          len: [2, 100],
+          notEmpty: {
+            msg: "El nombre es requerido",
+          },
+          len: {
+            args: [1, 100],
+            msg: "El nombre debe tener entre 1 y 100 caracteres",
+          },
         },
       },
       tipo_documento: {

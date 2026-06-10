@@ -1,10 +1,12 @@
-const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio, Prestacion, UsuarioPaciente } = require("../../src/models")
+const { Turno, Paciente, Profesional, Servicio, SubServicio, ProfesionalServicio, Prestacion, UsuarioPaciente, Feriado, Ausencia, ObraSocial } = require("../../src/models")
 
 jest.mock("../../src/models", () => ({
   Turno: {
     findOne: jest.fn(),
     findByPk: jest.fn(),
     findAndCountAll: jest.fn(),
+    count: jest.fn(),
+    findAll: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     destroy: jest.fn()
@@ -43,13 +45,24 @@ jest.mock("../../src/models", () => ({
   UsuarioPaciente: {
     findOne: jest.fn(),
     create: jest.fn()
+  },
+  Feriado: {
+    findOne: jest.fn()
+  },
+  Ausencia: {
+    findOne: jest.fn(),
+    findAll: jest.fn()
+  },
+  ObraSocial: {
+    findOne: jest.fn()
   }
 }))
 
 jest.mock("../../src/services/emailService", () => ({
   enviarConfirmacionTurno: jest.fn().mockResolvedValue(true),
   enviarCancelacionTurno: jest.fn().mockResolvedValue(true),
-  enviarReprogramacionTurno: jest.fn().mockResolvedValue(true)
+  enviarReprogramacionTurno: jest.fn().mockResolvedValue(true),
+  enviarTurnoPendiente: jest.fn().mockResolvedValue(true)
 }))
 
 jest.mock("../../src/services/whatsappNotifications", () => ({
@@ -88,6 +101,8 @@ describe("turnoController", () => {
       status: jest.fn().mockReturnThis(),
       json: jest.fn()
     }
+    Feriado.findOne.mockResolvedValue(null)
+    Ausencia.findOne.mockResolvedValue(null)
   })
 
   describe("crearTurno", () => {
@@ -343,16 +358,14 @@ describe("turnoController", () => {
     it("should return paginated turnos", async () => {
       mockReq.query = { page: "1", limit: "10" }
 
-      const mockTurnos = {
-        count: 1,
-        rows: [{ id: 1, fecha: "2024-06-15" }]
-      }
-      Turno.findAndCountAll.mockResolvedValue(mockTurnos)
+      const mockRows = [{ id: 1, fecha: "2024-06-15" }]
+      Turno.count.mockResolvedValue(1)
+      Turno.findAll.mockResolvedValue(mockRows)
 
       await listarTurnos(mockReq, mockRes)
 
       expect(mockRes.json).toHaveBeenCalledWith({
-        turnos: mockTurnos.rows,
+        turnos: mockRows,
         pagination: {
           total: 1,
           page: 1,
@@ -365,11 +378,13 @@ describe("turnoController", () => {
     it("should filter by date range", async () => {
       mockReq.query = { fecha_desde: "2024-06-01", fecha_hasta: "2024-06-30" }
 
-      Turno.findAndCountAll.mockResolvedValue({ count: 0, rows: [] })
+      Turno.count.mockResolvedValue(0)
+      Turno.findAll.mockResolvedValue([])
 
       await listarTurnos(mockReq, mockRes)
 
-      expect(Turno.findAndCountAll).toHaveBeenCalled()
+      expect(Turno.count).toHaveBeenCalled()
+      expect(Turno.findAll).toHaveBeenCalled()
     })
   })
 

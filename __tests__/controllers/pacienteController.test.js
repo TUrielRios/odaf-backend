@@ -1,10 +1,12 @@
-const { Paciente, ObraSocial, Odontograma, HistorialClinico, Prescripcion, PlanTratamiento, Archivo, Turno, Prestacion, UsuarioPaciente } = require("../../src/models")
+const { Paciente, ObraSocial, Odontograma, HistorialClinico, Prescripcion, PlanTratamiento, Archivo, Turno, Prestacion, UsuarioPaciente, Presupuesto } = require("../../src/models")
 
 jest.mock("../../src/models", () => ({
   Paciente: {
     findOne: jest.fn(),
     findByPk: jest.fn(),
     findAndCountAll: jest.fn(),
+    findAll: jest.fn(),
+    count: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
     destroy: jest.fn()
@@ -35,6 +37,9 @@ jest.mock("../../src/models", () => ({
     destroy: jest.fn()
   },
   UsuarioPaciente: {
+    destroy: jest.fn()
+  },
+  Presupuesto: {
     destroy: jest.fn()
   }
 }))
@@ -114,16 +119,14 @@ describe("pacienteController", () => {
     it("should return paginated pacientes", async () => {
       mockReq.query = { page: "1", limit: "10" }
 
-      const mockPacientes = {
-        count: 1,
-        rows: [{ id: "uuid-123", nombre: "Juan", apellido: "Perez" }]
-      }
-      Paciente.findAndCountAll.mockResolvedValue(mockPacientes)
+      const mockRows = [{ id: "uuid-123", nombre: "Juan", apellido: "Perez" }]
+      Paciente.count.mockResolvedValue(1)
+      Paciente.findAll.mockResolvedValue(mockRows)
 
       await listarPacientes(mockReq, mockRes)
 
       expect(mockRes.json).toHaveBeenCalledWith({
-        pacientes: mockPacientes.rows,
+        pacientes: mockRows,
         pagination: {
           total: 1,
           page: 1,
@@ -136,11 +139,13 @@ describe("pacienteController", () => {
     it("should filter by search", async () => {
       mockReq.query = { search: "Juan" }
 
-      Paciente.findAndCountAll.mockResolvedValue({ count: 0, rows: [] })
+      Paciente.count.mockResolvedValue(0)
+      Paciente.findAll.mockResolvedValue([])
 
       await listarPacientes(mockReq, mockRes)
 
-      expect(Paciente.findAndCountAll).toHaveBeenCalled()
+      expect(Paciente.count).toHaveBeenCalled()
+      expect(Paciente.findAll).toHaveBeenCalled()
     })
   })
 
