@@ -7,6 +7,14 @@ jest.mock("jsonwebtoken", () => ({
   sign: jest.fn().mockReturnValue("mock_token")
 }))
 
+jest.mock("../../src/models", () => ({
+  UsuarioAdmin: {
+    findOne: jest.fn(),
+    findByPk: jest.fn()
+  }
+}))
+
+const { UsuarioAdmin } = require("../../src/models")
 const { login, register, me } = require("../../src/controllers/authController")
 
 describe("authController", () => {
@@ -34,15 +42,27 @@ describe("authController", () => {
         password: "password"
       }
 
+      UsuarioAdmin.findOne.mockResolvedValue({
+        id: 1,
+        email: "admin@dental.com",
+        password: "hashed_password",
+        nombre: "Administrador",
+        role: "admin",
+        activo: true
+      })
+
       await login(mockReq, mockRes)
 
       expect(mockRes.json).toHaveBeenCalledWith({
-        token: "mock_token",
-        user: {
-          id: 1,
-          email: "admin@dental.com",
-          nombre: "Administrador",
-          role: "admin"
+        data: {
+          token: "mock_token",
+          user: {
+            id: 1,
+            email: "admin@dental.com",
+            nombre: "Administrador",
+            role: "admin",
+            permisos_tabs: null
+          }
         }
       })
     })
@@ -52,6 +72,8 @@ describe("authController", () => {
         email: "wrong@test.com",
         password: "password"
       }
+
+      UsuarioAdmin.findOne.mockResolvedValue(null)
 
       await login(mockReq, mockRes)
 
@@ -65,6 +87,15 @@ describe("authController", () => {
         password: "wrongpassword"
       }
 
+      UsuarioAdmin.findOne.mockResolvedValue({
+        id: 1,
+        email: "admin@dental.com",
+        password: "hashed_password",
+        nombre: "Administrador",
+        role: "admin",
+        activo: true
+      })
+
       const bcrypt = require("bcryptjs")
       bcrypt.compare.mockResolvedValueOnce(false)
 
@@ -75,7 +106,7 @@ describe("authController", () => {
   })
 
   describe("register", () => {
-    it("should register new user successfully", async () => {
+    it("should return 403 since registration is disabled", async () => {
       mockReq.body = {
         email: "newadmin@test.com",
         password: "newpassword",
@@ -84,21 +115,8 @@ describe("authController", () => {
 
       await register(mockReq, mockRes)
 
-      expect(mockRes.status).toHaveBeenCalledWith(201)
-      expect(mockRes.json).toHaveBeenCalled()
-    })
-
-    it("should fail if user already exists", async () => {
-      mockReq.body = {
-        email: "admin@dental.com",
-        password: "password",
-        nombre: "Admin"
-      }
-
-      await register(mockReq, mockRes)
-
-      expect(mockRes.status).toHaveBeenCalledWith(400)
-      expect(mockRes.json).toHaveBeenCalledWith({ error: "El usuario ya existe" })
+      expect(mockRes.status).toHaveBeenCalledWith(403)
+      expect(mockRes.json).toHaveBeenCalledWith({ error: "Registro deshabilitado" })
     })
   })
 
@@ -106,18 +124,31 @@ describe("authController", () => {
     it("should return current user info", async () => {
       mockReq.user = { userId: 1 }
 
-      await me(mockReq, mockRes)
-
-      expect(mockRes.json).toHaveBeenCalledWith({
+      UsuarioAdmin.findByPk.mockResolvedValue({
         id: 1,
         email: "admin@dental.com",
         nombre: "Administrador",
-        role: "admin"
+        role: "admin",
+        permisos_tabs: null
+      })
+
+      await me(mockReq, mockRes)
+
+      expect(mockRes.json).toHaveBeenCalledWith({
+        data: {
+          id: 1,
+          email: "admin@dental.com",
+          nombre: "Administrador",
+          role: "admin",
+          permisos_tabs: null
+        }
       })
     })
 
     it("should return 404 if user not found", async () => {
       mockReq.user = { userId: 999 }
+
+      UsuarioAdmin.findByPk.mockResolvedValue(null)
 
       await me(mockReq, mockRes)
 

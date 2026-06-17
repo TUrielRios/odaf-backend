@@ -17,5 +17,6 @@ module.exports = {
   },
   moduleFileExtensions: ['js', 'json'],
   verbose: true,
-  testTimeout: 10000
+  testTimeout: 10000,
+  setupFiles: ["dotenv/config"]
 };

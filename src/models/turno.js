@@ -73,6 +73,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.BOOLEAN,
         defaultValue: false,
       },
+      agendado_por: {
+        type: DataTypes.STRING,
+        allowNull: true,
+      },
     },
     {
       tableName: "turnos",
