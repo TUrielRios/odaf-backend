@@ -65,7 +65,7 @@ exports.obtenerLiquidacionPorId = async (req, res) => {
         {
           model: Profesional,
           as: "profesional",
-          attributes: ["id", "nombre", "apellido", "numero_matricula", "email"],
+          attributes: ["id", "nombre", "apellido", "numero_matricula", "email", "porcentaje_comision"],
         },
         {
           model: Prestacion,
@@ -113,7 +113,7 @@ exports.generarLiquidacion = async (req, res) => {
       return res.status(400).json({ errors: errors.array() })
     }
 
-    const { profesional_id, periodo_inicio, periodo_fin, observaciones, monto_custom } = req.body
+    const { profesional_id, periodo_inicio, periodo_fin, observaciones, monto_custom, tipo, obra_social_id } = req.body
 
     // Verificar que el profesional existe
     const profesional = await Profesional.findByPk(profesional_id)
@@ -121,23 +121,39 @@ exports.generarLiquidacion = async (req, res) => {
       return res.status(404).json({ message: "Profesional no encontrado" })
     }
 
-    // Buscar prestaciones pendientes del profesional en el período
-    const prestaciones = await Prestacion.findAll({
-      where: {
-        profesional_id,
-        fecha: {
-          [Op.between]: [periodo_inicio, periodo_fin],
-        },
-        estado: "Pendiente",
-        liquidacion_id: null,
+    // Buscar prestaciones pendientes del profesional en el período,
+    // con los mismos filtros que usa la simulación para que lo confirmado
+    // coincida exactamente con lo previsualizado
+    const wherePrestaciones = {
+      profesional_id,
+      fecha: {
+        [Op.between]: [periodo_inicio, periodo_fin],
       },
-      include: [
-        {
-          model: Servicio,
-          as: "servicio",
-          attributes: ["nombre"],
-        },
-      ],
+      estado: "Pendiente",
+      liquidacion_id: null,
+    }
+
+    const includePrestaciones = [
+      {
+        model: Servicio,
+        as: "servicio",
+        attributes: ["nombre"],
+      },
+    ]
+
+    if (tipo === "obra_social") {
+      wherePrestaciones["$paciente.obra_social_id$"] = obra_social_id || { [Op.ne]: null }
+      includePrestaciones.push({
+        model: Paciente,
+        as: "paciente",
+        attributes: ["id", "obra_social_id"],
+      })
+    }
+
+    const prestaciones = await Prestacion.findAll({
+      where: wherePrestaciones,
+      include: includePrestaciones,
+      subQuery: false,
     })
 
     if (prestaciones.length === 0) {
@@ -419,36 +435,41 @@ exports.obtenerResumenPorProfesional = async (req, res) => {
     res.status(500).json({ message: "Error al obtener resumen", error: error.message })
   }
 }
+// Zona horaria de la clínica: los períodos se calculan siempre en hora argentina,
+// sin importar la zona horaria del servidor.
+const TIMEZONE_CLINICA = "America/Argentina/Buenos_Aires"
+
+// Fecha "YYYY-MM-DD" a partir de componentes numéricos
+const formatYMD = (anio, mes, dia) => `${anio}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`
+
 // Simular una liquidación (Pre-visualización)
 exports.simularLiquidacion = async (req, res) => {
   try {
     const { profesional_id, periodo, tipo, obra_social_id, fecha_custom_inicio, fecha_custom_fin } = req.body
 
-    // Determinar fechas según el período seleccionado
-    let fechaInicio = new Date()
-    let fechaFin = new Date()
+    // Determinar el rango de fechas (strings "YYYY-MM-DD", comparables con la columna DATEONLY).
+    // "Hoy" en hora argentina; en-CA formatea como YYYY-MM-DD.
+    const hoyStr = new Date().toLocaleDateString("en-CA", { timeZone: TIMEZONE_CLINICA })
+    const [anio, mes, dia] = hoyStr.split("-").map(Number)
+    // Date local solo para aritmética de días (mediodía para evitar bordes de día)
+    const hoy = new Date(anio, mes - 1, dia, 12)
 
-    if (periodo === "hoy") {
-      fechaInicio.setHours(0, 0, 0, 0)
-      fechaFin.setHours(23, 59, 59, 999)
-    } else if (periodo === "semana") {
-      const day = fechaInicio.getDay()
-      const diff = fechaInicio.getDate() - day + (day === 0 ? -6 : 1) // Ajustar al lunes
-      fechaInicio.setDate(diff)
-      fechaInicio.setHours(0, 0, 0, 0)
-      fechaFin.setHours(23, 59, 59, 999)
+    let fechaInicio = hoyStr
+    let fechaFin = hoyStr
+
+    if (periodo === "semana") {
+      const day = hoy.getDay()
+      const lunes = new Date(hoy)
+      lunes.setDate(hoy.getDate() - day + (day === 0 ? -6 : 1)) // Ajustar al lunes
+      fechaInicio = formatYMD(lunes.getFullYear(), lunes.getMonth() + 1, lunes.getDate())
     } else if (periodo === "mes") {
-      fechaInicio.setDate(1)
-      fechaInicio.setHours(0, 0, 0, 0)
-      fechaFin.setHours(23, 59, 59, 999)
+      fechaInicio = formatYMD(anio, mes, 1)
     } else if (periodo === "custom") {
       if (!fecha_custom_inicio || !fecha_custom_fin) {
         return res.status(400).json({ message: "Debe especificar fecha de inicio y fin para rango personalizado" })
       }
-      fechaInicio = new Date(fecha_custom_inicio)
-      fechaFin = new Date(fecha_custom_fin)
-      // Ajustar fin del día para la fecha fin
-      fechaFin.setHours(23, 59, 59, 999)
+      fechaInicio = String(fecha_custom_inicio).slice(0, 10)
+      fechaFin = String(fecha_custom_fin).slice(0, 10)
     }
 
     const where = {

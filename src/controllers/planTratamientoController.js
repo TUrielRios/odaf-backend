@@ -417,7 +417,7 @@ const actualizarTratamiento = async (req, res) => {
           profesional_id: profesionalId,
           paciente_id: plan.paciente_id,
           tratamiento_id: tratamiento.id,
-          fecha: new Date().toISOString().split("T")[0],
+          fecha: tratamiento.fecha_inicio,
           descripcion: `Tratamiento: ${tratamiento.procedimiento_id ? (await Procedimiento.findByPk(tratamiento.procedimiento_id))?.nombre : "Sin procedimiento"} - ${tratamiento.nomenclador}${tratamiento.pieza_numero ? ` (Pieza ${tratamiento.pieza_numero})` : ""}`,
           monto_total: montoTotal,
           porcentaje_profesional: porcentajeProfesional,
