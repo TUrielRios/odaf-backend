@@ -53,6 +53,9 @@ const validacionMarcarPagado = [
  * Rutas
  */
 
+// Recalcular montos de prestaciones pendientes con monto = 0
+router.post("/recalcular", prestacionController.recalcularPrestaciones)
+
 // CRUD básico de prestaciones
 router.get("/", prestacionController.listarPrestaciones)
 router.post("/", validacionCrearPrestacion, prestacionController.crearPrestacion)

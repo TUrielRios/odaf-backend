@@ -25,11 +25,13 @@ const validarAnularLiquidacion = [
 
 // Rutas
 router.get("/", liquidacionController.obtenerLiquidaciones)
+router.post("/simular", liquidacionController.simularLiquidacion)
+router.get("/profesional/:profesional_id/resumen", liquidacionController.obtenerResumenPorProfesional)
 router.get("/:id", liquidacionController.obtenerLiquidacionPorId)
 router.post("/", validarGenerarLiquidacion, liquidacionController.generarLiquidacion)
 router.put("/:id/pagar", validarRegistrarPago, liquidacionController.registrarPago)
 router.put("/:id/anular", validarAnularLiquidacion, liquidacionController.anularLiquidacion)
-router.get("/profesional/:profesional_id/resumen", liquidacionController.obtenerResumenPorProfesional)
-router.post("/simular", liquidacionController.simularLiquidacion)
+router.put("/:id", liquidacionController.actualizarLiquidacion)
+router.delete("/:id", liquidacionController.eliminarLiquidacion)
 
 module.exports = router

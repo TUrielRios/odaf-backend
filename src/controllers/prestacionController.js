@@ -1,4 +1,4 @@
-const { Prestacion, Profesional, Paciente, Servicio, SubServicio, Turno } = require("../models")
+const { Prestacion, Profesional, Paciente, Servicio, SubServicio, Turno, Tratamiento, Copago, ObraSocial } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
 const sequelize = require("sequelize")
@@ -536,6 +536,135 @@ const obtenerResumenProfesional = async (req, res) => {
   }
 }
 
+const recalcularPrestaciones = async (req, res) => {
+  try {
+    const prestaciones = await Prestacion.findAll({
+      where: { estado: "Pendiente", liquidacion_id: null, monto_total: 0 },
+      include: [
+        { model: Tratamiento, as: "tratamiento", required: false },
+        {
+          model: Turno, as: "turno", required: false,
+          include: [
+            { model: Servicio, as: "servicio", required: false },
+            { model: SubServicio, as: "subservicio", required: false },
+          ],
+        },
+        {
+          model: Paciente, as: "paciente", required: false,
+          include: [{ model: ObraSocial, as: "obraSocial", required: false }],
+        },
+      ],
+      order: [["fecha", "ASC"], ["id", "ASC"]],
+    })
+
+    console.log(`\n[RECALCULAR] Total prestaciones con $0: ${prestaciones.length}`)
+    prestaciones.forEach((p, i) => {
+      console.log(
+        `  [${i+1}] id=${p.id} fecha=${p.fecha}` +
+        ` turno_id=${p.turno_id ?? "null"}` +
+        ` tratamiento_id=${p.tratamiento_id ?? "null"}` +
+        ` obs="${(p.observaciones || "").substring(0, 80)}"`
+      )
+    })
+
+    let actualizadas = 0
+    let sinPrecio = 0
+
+    // Cache de tratamientos por plan para no repetir queries
+    // Map<planId, { todos: Tratamiento[], usados: Set<id> }>
+    const cachePlanes = new Map()
+
+    for (const prestacion of prestaciones) {
+      let montoTotal = 0
+      const porcentaje = parseFloat(prestacion.porcentaje_profesional) || 50
+
+      if (prestacion.tratamiento) {
+        // FK directa al tratamiento (prestaciones nuevas post-fix)
+        montoTotal =
+          (parseFloat(prestacion.tratamiento.precio_paciente) || 0) +
+          (parseFloat(prestacion.tratamiento.cobertura_obra_social) || 0)
+        console.log(`  → [id=${prestacion.id}] via tratamiento_id=${prestacion.tratamiento.id}: precio_paciente=${prestacion.tratamiento.precio_paciente} cobertura=${prestacion.tratamiento.cobertura_obra_social} => montoTotal=${montoTotal}`)
+
+      } else if (!prestacion.turno_id) {
+        // Sin turno → vino de plan de tratamiento antes de que existiera tratamiento_id
+        const match = prestacion.observaciones?.match(/Plan de Tratamiento #(\d+)/)
+        console.log(`  → [id=${prestacion.id}] sin turno_id, obs match: ${match ? `plan #${match[1]}` : "NO MATCH"}`)
+        if (match) {
+          const planId = parseInt(match[1])
+
+          if (!cachePlanes.has(planId)) {
+            const todos = await Tratamiento.findAll({
+              where: {
+                plan_tratamiento_id: planId,
+                estado: "Terminado",
+              },
+              order: [["updatedAt", "ASC"]],
+            })
+            console.log(`    → Plan #${planId}: ${todos.length} tratamientos Terminado encontrados (sin filtro profesional_id)`)
+            todos.forEach(t => console.log(`       tratamiento id=${t.id} profesional_id=${t.profesional_id} precio_paciente=${t.precio_paciente} cobertura=${t.cobertura_obra_social} updatedAt=${t.updatedAt}`))
+            cachePlanes.set(planId, { todos, usados: new Set() })
+          }
+
+          const { todos, usados } = cachePlanes.get(planId)
+          const disponibles = todos.filter(t => !usados.has(t.id))
+
+          const toISODate = (d) => {
+            const dt = new Date(d)
+            return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`
+          }
+
+          let matching = disponibles.find(t => toISODate(t.updatedAt) === prestacion.fecha)
+          if (!matching) matching = disponibles[0]
+
+          if (matching) {
+            montoTotal =
+              (parseFloat(matching.precio_paciente) || 0) +
+              (parseFloat(matching.cobertura_obra_social) || 0)
+            usados.add(matching.id)
+            console.log(`    → Matched tratamiento id=${matching.id} => montoTotal=${montoTotal}`)
+          } else {
+            console.log(`    → SIN MATCH disponible (${disponibles.length} disponibles)`)
+          }
+        }
+
+      } else if (prestacion.turno) {
+        // Vino de turno — subservicio → copago → servicio.precio_base
+        const subPrecio = prestacion.turno.subservicio ? parseFloat(prestacion.turno.subservicio.precio) : 0
+        const servicioBase = prestacion.turno.servicio ? parseFloat(prestacion.turno.servicio.precio_base) : 0
+
+        if (subPrecio > 0) {
+          montoTotal = subPrecio
+        } else if (prestacion.paciente?.obraSocial && prestacion.servicio_id) {
+          const copago = await Copago.findOne({
+            where: { servicio_id: prestacion.servicio_id, obra_social_id: prestacion.paciente.obraSocial.id },
+          })
+          montoTotal = copago && parseFloat(copago.monto) > 0 ? parseFloat(copago.monto) : servicioBase
+        } else {
+          montoTotal = servicioBase
+        }
+      }
+
+      if (montoTotal > 0) {
+        const montoProfesional = parseFloat(((montoTotal * porcentaje) / 100).toFixed(2))
+        await prestacion.update({ monto_total: montoTotal, monto_profesional: montoProfesional })
+        actualizadas++
+      } else {
+        sinPrecio++
+      }
+    }
+
+    res.json({
+      message: "Recalculación completada",
+      total_revisadas: prestaciones.length,
+      actualizadas,
+      sin_precio_configurado: sinPrecio,
+    })
+  } catch (error) {
+    console.error("Error al recalcular prestaciones:", error)
+    res.status(500).json({ message: "Error al recalcular prestaciones", error: error.message })
+  }
+}
+
 module.exports = {
   listarPrestaciones,
   crearPrestacion,
@@ -546,4 +675,5 @@ module.exports = {
   liquidarPrestaciones,
   marcarComoPagado,
   obtenerResumenProfesional,
+  recalcularPrestaciones,
 }

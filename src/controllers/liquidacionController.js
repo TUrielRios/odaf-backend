@@ -314,6 +314,60 @@ exports.anularLiquidacion = async (req, res) => {
   }
 }
 
+// Actualizar monto u observaciones de una liquidación (solo si no está Pagada)
+exports.actualizarLiquidacion = async (req, res) => {
+  try {
+    const { id } = req.params
+    const { monto_profesional, observaciones } = req.body
+
+    const liquidacion = await Liquidacion.findByPk(id)
+    if (!liquidacion) return res.status(404).json({ message: "Liquidación no encontrada" })
+    if (liquidacion.estado === "Pagada") {
+      return res.status(400).json({ message: "No se puede editar una liquidación ya pagada" })
+    }
+
+    const updates = {}
+    if (monto_profesional !== undefined) updates.monto_profesional = parseFloat(monto_profesional).toFixed(2)
+    if (observaciones !== undefined) updates.observaciones = observaciones
+
+    await liquidacion.update(updates)
+    res.json(liquidacion)
+  } catch (error) {
+    console.error("Error al actualizar liquidación:", error)
+    res.status(500).json({ message: "Error al actualizar liquidación", error: error.message })
+  }
+}
+
+// Eliminar permanentemente una liquidación (solo si no está Pagada)
+exports.eliminarLiquidacion = async (req, res) => {
+  try {
+    const { id } = req.params
+
+    const liquidacion = await Liquidacion.findByPk(id)
+
+    if (!liquidacion) {
+      return res.status(404).json({ message: "Liquidación no encontrada" })
+    }
+
+    if (liquidacion.estado === "Pagada") {
+      return res.status(400).json({ message: "No se puede eliminar una liquidación ya pagada" })
+    }
+
+    // Revertir prestaciones asociadas antes de borrar
+    await Prestacion.update(
+      { liquidacion_id: null, estado: "Pendiente", fecha_liquidacion: null },
+      { where: { liquidacion_id: id } }
+    )
+
+    await liquidacion.destroy()
+
+    res.json({ message: "Liquidación eliminada correctamente" })
+  } catch (error) {
+    console.error("Error al eliminar liquidación:", error)
+    res.status(500).json({ message: "Error al eliminar liquidación", error: error.message })
+  }
+}
+
 // Obtener resumen de liquidaciones por profesional
 exports.obtenerResumenPorProfesional = async (req, res) => {
   try {
@@ -446,6 +500,30 @@ exports.simularLiquidacion = async (req, res) => {
       include,
       subQuery: false,
     })
+
+    // ─── DEBUG LOGGING ───────────────────────────────────────────────────────
+    console.log("\n══════════════════════════════════════════════")
+    console.log(`[SIMULAR] profesional_id=${profesional_id} tipo=${tipo} periodo=${periodo}`)
+    console.log(`[SIMULAR] Rango: ${fechaInicio.toISOString().split("T")[0]} → ${fechaFin.toISOString().split("T")[0]}`)
+    console.log(`[SIMULAR] Total prestaciones encontradas: ${prestaciones.length}`)
+    let sumTotal = 0, sumProf = 0
+    prestaciones.forEach((p, i) => {
+      const mt = parseFloat(p.monto_total)
+      const mp = parseFloat(p.monto_profesional)
+      sumTotal += mt
+      sumProf  += mp
+      console.log(
+        `  [${i+1}] id=${p.id} fecha=${p.fecha}` +
+        ` turno_id=${p.turno_id ?? "null"}` +
+        ` tratamiento_id=${p.tratamiento_id ?? "null"}` +
+        ` monto_total=${mt} monto_prof=${mp}` +
+        ` paciente="${p.paciente?.apellido} ${p.paciente?.nombre}"` +
+        ` obs="${(p.observaciones || "").substring(0, 60)}"`
+      )
+    })
+    console.log(`[SIMULAR] SUMA monto_total=${sumTotal} monto_profesional=${sumProf}`)
+    console.log("══════════════════════════════════════════════\n")
+    // ─────────────────────────────────────────────────────────────────────────
 
     // Calcular totales
     const monto_total_servicios = prestaciones.reduce((sum, p) => sum + parseFloat(p.monto_total), 0)

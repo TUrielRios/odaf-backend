@@ -44,6 +44,15 @@ module.exports = (sequelize, DataTypes) => {
         },
         comment: "Referencia al turno asociado si existe",
       },
+      tratamiento_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+          model: "tratamientos",
+          key: "id",
+        },
+        comment: "Referencia al tratamiento del plan si fue generado desde un plan",
+      },
       liquidacion_id: {
         type: DataTypes.INTEGER,
         references: {
@@ -148,6 +157,11 @@ module.exports = (sequelize, DataTypes) => {
     Prestacion.belongsTo(models.Liquidacion, {
       foreignKey: "liquidacion_id",
       as: "liquidacion",
+    })
+
+    Prestacion.belongsTo(models.Tratamiento, {
+      foreignKey: "tratamiento_id",
+      as: "tratamiento",
     })
   }
 
