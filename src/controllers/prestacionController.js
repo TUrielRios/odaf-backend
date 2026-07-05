@@ -570,13 +570,23 @@ const recalcularPrestaciones = async (req, res) => {
     let actualizadas = 0
     let sinPrecio = 0
 
+    // Cache de comisiones por profesional_id
+    const cacheProfesionales = new Map()
+    const getPorcentaje = async (profesional_id) => {
+      if (!cacheProfesionales.has(profesional_id)) {
+        const prof = await Profesional.findByPk(profesional_id, { attributes: ["id", "porcentaje_comision"] })
+        cacheProfesionales.set(profesional_id, parseFloat(prof?.porcentaje_comision) || 50)
+      }
+      return cacheProfesionales.get(profesional_id)
+    }
+
     // Cache de tratamientos por plan para no repetir queries
     // Map<planId, { todos: Tratamiento[], usados: Set<id> }>
     const cachePlanes = new Map()
 
     for (const prestacion of prestaciones) {
       let montoTotal = 0
-      const porcentaje = parseFloat(prestacion.porcentaje_profesional) || 50
+      const porcentaje = await getPorcentaje(prestacion.profesional_id)
 
       if (prestacion.tratamiento) {
         // FK directa al tratamiento (prestaciones nuevas post-fix)
@@ -646,11 +656,31 @@ const recalcularPrestaciones = async (req, res) => {
 
       if (montoTotal > 0) {
         const montoProfesional = parseFloat(((montoTotal * porcentaje) / 100).toFixed(2))
-        await prestacion.update({ monto_total: montoTotal, monto_profesional: montoProfesional })
+        await prestacion.update({ monto_total: montoTotal, monto_profesional: montoProfesional, porcentaje_profesional: porcentaje })
         actualizadas++
       } else {
         sinPrecio++
       }
+    }
+
+    // ── Fase 2: prestaciones con monto_total > 0 pero porcentaje incorrecto ─
+    const conPrecioMalPct = await Prestacion.findAll({
+      where: { estado: "Pendiente", liquidacion_id: null },
+      attributes: ["id", "profesional_id", "monto_total", "porcentaje_profesional"],
+      include: [{ model: Profesional, as: "profesional", attributes: ["id", "porcentaje_comision"] }],
+    })
+
+    let corregidas = 0
+    for (const p of conPrecioMalPct) {
+      const mt = parseFloat(p.monto_total)
+      if (mt <= 0) continue
+      const pctCorrecto = parseFloat(p.profesional?.porcentaje_comision) || 50
+      const pctGuardado = parseFloat(p.porcentaje_profesional) || 50
+      if (Math.abs(pctCorrecto - pctGuardado) < 0.01) continue
+
+      const mpNuevo = parseFloat(((mt * pctCorrecto) / 100).toFixed(2))
+      await p.update({ monto_profesional: mpNuevo, porcentaje_profesional: pctCorrecto })
+      corregidas++
     }
 
     res.json({
@@ -658,6 +688,7 @@ const recalcularPrestaciones = async (req, res) => {
       total_revisadas: prestaciones.length,
       actualizadas,
       sin_precio_configurado: sinPrecio,
+      comision_corregida: corregidas,
     })
   } catch (error) {
     console.error("Error al recalcular prestaciones:", error)

@@ -1,14 +1,19 @@
 /**
- * Script de migración para corregir prestaciones con monto_total = 0
- * que fueron generadas automáticamente desde planes de tratamiento.
+ * Script de migración en dos fases:
+ *
+ *  Fase 1 – Prestaciones con monto_total = 0 (sin precio)
+ *            Busca el precio en el tratamiento/turno correspondiente y recalcula.
+ *
+ *  Fase 2 – Prestaciones con monto_total > 0 pero porcentaje_profesional
+ *            no coincide con el porcentaje_comision actual del profesional.
+ *            (Caso típico: se crearon con 100 % y no se aplicó la comisión real.)
+ *            Recalcula monto_profesional = monto_total × comision / 100.
  *
  * Ejecutar desde la carpeta backend/:
  *   node fix_prestaciones_zero.js
- *
- * Requiere las variables de entorno del .env (DB_NAME, DB_USER, etc.)
  */
 require("dotenv").config()
-const { Sequelize, Op } = require("sequelize")
+const { Sequelize } = require("sequelize")
 
 const db = new Sequelize({
   database: process.env.DB_NAME,
@@ -20,20 +25,54 @@ const db = new Sequelize({
   logging: false,
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+const cacheProfesionales = new Map()
+async function getPorcentaje(profesional_id) {
+  if (!cacheProfesionales.has(profesional_id)) {
+    const [[prof]] = await db.query(
+      `SELECT porcentaje_comision FROM profesionales WHERE id = :id`,
+      { replacements: { id: profesional_id } }
+    )
+    const pct = prof ? parseFloat(prof.porcentaje_comision) || 50 : 50
+    cacheProfesionales.set(profesional_id, pct)
+    console.log(`  Profesional id=${profesional_id}: porcentaje_comision=${pct}%`)
+  }
+  return cacheProfesionales.get(profesional_id)
+}
+
+const toDate = (d) => {
+  if (!d) return ""
+  const dt = new Date(d)
+  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 async function run() {
   await db.authenticate()
   console.log("✅ Conectado a la base de datos\n")
 
-  // Asegurarse que la columna tratamiento_id existe
+  // Asegurar columna tratamiento_id
   await db.query(`
     ALTER TABLE prestaciones
-    ADD COLUMN IF NOT EXISTS tratamiento_id INTEGER REFERENCES tratamientos(id) ON UPDATE CASCADE ON DELETE SET NULL;
+    ADD COLUMN IF NOT EXISTS tratamiento_id INTEGER
+      REFERENCES tratamientos(id) ON UPDATE CASCADE ON DELETE SET NULL;
   `)
   console.log("✅ Columna tratamiento_id verificada\n")
 
-  // 1. Traer todas las prestaciones Pendiente con monto_total = 0
-  const [prestaciones] = await db.query(`
-    SELECT p.id, p.profesional_id, p.fecha, p.porcentaje_profesional, p.observaciones, p.turno_id, p.tratamiento_id
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FASE 1: prestaciones con monto_total = 0  →  buscar precio real
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log("╔═══════════════════════════════════════════════╗")
+  console.log("║  FASE 1 – Prestaciones con monto_total = $0   ║")
+  console.log("╚═══════════════════════════════════════════════╝\n")
+
+  const [fase1] = await db.query(`
+    SELECT p.id, p.profesional_id, p.fecha, p.porcentaje_profesional,
+           p.observaciones, p.turno_id, p.tratamiento_id
     FROM prestaciones p
     WHERE p.monto_total = 0
       AND p.estado = 'Pendiente'
@@ -41,144 +80,169 @@ async function run() {
     ORDER BY p.fecha ASC, p.id ASC
   `)
 
-  console.log(`📋 Prestaciones con $0 encontradas: ${prestaciones.length}\n`)
+  console.log(`📋 Encontradas: ${fase1.length}\n`)
 
-  // Mostrar resumen
-  prestaciones.forEach((p, i) => {
-    console.log(
-      `  [${i + 1}] id=${p.id} fecha=${p.fecha}` +
-      ` profesional_id=${p.profesional_id}` +
-      ` turno_id=${p.turno_id ?? "null"}` +
-      ` tratamiento_id=${p.tratamiento_id ?? "null"}` +
-      ` obs="${(p.observaciones || "").substring(0, 70)}"`
-    )
-  })
-
-  console.log("\n─────────────────────────────────────────────\n")
-
-  let actualizadas = 0
-  let sinPrecio = 0
-  const errores = []
-
-  // Cache por plan_id => lista de tratamientos Terminado
+  let f1actualizadas = 0
+  let f1sinPrecio = 0
   const cachePlanes = new Map()
 
-  for (const prestacion of prestaciones) {
+  for (const p of fase1) {
     let montoTotal = 0
-    const porcentaje = parseFloat(prestacion.porcentaje_profesional) || 50
+    const porcentaje = await getPorcentaje(p.profesional_id)
 
-    // ── Caso 1: tiene tratamiento_id directo ──────────────────────────────
-    if (prestacion.tratamiento_id) {
-      const [[trat]] = await db.query(`
-        SELECT precio_paciente, cobertura_obra_social
-        FROM tratamientos
-        WHERE id = :id
-      `, { replacements: { id: prestacion.tratamiento_id } })
-
+    if (p.tratamiento_id) {
+      // Tiene FK directa al tratamiento
+      const [[trat]] = await db.query(
+        `SELECT precio_paciente, cobertura_obra_social FROM tratamientos WHERE id = :id`,
+        { replacements: { id: p.tratamiento_id } }
+      )
       if (trat) {
         montoTotal = parseFloat(trat.precio_paciente || 0) + parseFloat(trat.cobertura_obra_social || 0)
-        console.log(`  [id=${prestacion.id}] via tratamiento_id=${prestacion.tratamiento_id}: precio_paciente=${trat.precio_paciente} cobertura=${trat.cobertura_obra_social} => $${montoTotal}`)
+        console.log(`  [id=${p.id}] tratamiento_id=${p.tratamiento_id}: precio_paciente=${trat.precio_paciente} cobertura=${trat.cobertura_obra_social} => $${montoTotal}`)
       }
 
-    // ── Caso 2: viene de plan de tratamiento (sin turno, con observaciones) ──
-    } else if (!prestacion.turno_id) {
-      const match = (prestacion.observaciones || "").match(/Plan de Tratamiento #(\d+)/)
+    } else if (!p.turno_id) {
+      // Generado desde plan de tratamiento (observaciones contienen el id del plan)
+      const match = (p.observaciones || "").match(/Plan de Tratamiento #(\d+)/)
       if (match) {
         const planId = parseInt(match[1])
 
         if (!cachePlanes.has(planId)) {
           const [tratamientos] = await db.query(`
-            SELECT id, profesional_id, precio_paciente, cobertura_obra_social, fecha_inicio, "updatedAt"
+            SELECT id, precio_paciente, cobertura_obra_social, "updatedAt"
             FROM tratamientos
-            WHERE plan_tratamiento_id = :planId
-              AND estado = 'Terminado'
+            WHERE plan_tratamiento_id = :planId AND estado = 'Terminado'
             ORDER BY "updatedAt" ASC
           `, { replacements: { planId } })
-
-          console.log(`\n  Plan #${planId}: ${tratamientos.length} tratamientos Terminado encontrados`)
+          console.log(`\n  Plan #${planId}: ${tratamientos.length} tratamientos Terminado`)
           tratamientos.forEach(t =>
-            console.log(`    tratamiento id=${t.id} profesional_id=${t.profesional_id} precio_paciente=${t.precio_paciente} cobertura=${t.cobertura_obra_social} updatedAt=${t.updatedAt}`)
+            console.log(`    id=${t.id} precio_paciente=${t.precio_paciente} cobertura=${t.cobertura_obra_social} updatedAt=${t.updatedAt}`)
           )
-
           cachePlanes.set(planId, { todos: tratamientos, usados: new Set() })
         }
 
         const { todos, usados } = cachePlanes.get(planId)
         const disponibles = todos.filter(t => !usados.has(t.id))
-
-        const toDate = (d) => {
-          if (!d) return ""
-          const dt = new Date(d)
-          return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`
-        }
-
-        // Intentar coincidir por fecha
-        let matching = disponibles.find(t => toDate(t.updatedAt) === prestacion.fecha)
-        if (!matching) matching = disponibles[0] // fallback: primer disponible
+        let matching = disponibles.find(t => toDate(t.updatedAt) === p.fecha) || disponibles[0]
 
         if (matching) {
           montoTotal = parseFloat(matching.precio_paciente || 0) + parseFloat(matching.cobertura_obra_social || 0)
           usados.add(matching.id)
-          console.log(`  [id=${prestacion.id}] Plan #${planId} → tratamiento id=${matching.id} => $${montoTotal}`)
+          console.log(`  [id=${p.id}] Plan #${planId} → tratamiento id=${matching.id} => $${montoTotal}`)
         } else {
-          console.log(`  [id=${prestacion.id}] Plan #${planId} → SIN TRATAMIENTO DISPONIBLE (${disponibles.length} disponibles)`)
+          console.log(`  [id=${p.id}] Plan #${planId} → SIN TRATAMIENTO DISPONIBLE`)
         }
       } else {
-        console.log(`  [id=${prestacion.id}] Sin turno_id y sin patrón en observaciones: "${prestacion.observaciones || ""}"`)
+        console.log(`  [id=${p.id}] Sin patrón en observaciones: "${(p.observaciones || "").substring(0, 70)}"`)
       }
 
-    // ── Caso 3: viene de turno ────────────────────────────────────────────
     } else {
-      const [[turnoRow]] = await db.query(`
-        SELECT t.id, t.servicio_id, t.subservicio_id,
-               sv.precio_base as servicio_precio,
-               ss.precio as sub_precio
+      // Generado desde turno
+      const [[turno]] = await db.query(`
+        SELECT sv.precio_base AS servicio_precio, ss.precio AS sub_precio
         FROM turnos t
         LEFT JOIN servicios sv ON sv.id = t.servicio_id
         LEFT JOIN sub_servicios ss ON ss.id = t.subservicio_id
         WHERE t.id = :turno_id
-      `, { replacements: { turno_id: prestacion.turno_id } })
+      `, { replacements: { turno_id: p.turno_id } })
 
-      if (turnoRow) {
-        if (parseFloat(turnoRow.sub_precio || 0) > 0) {
-          montoTotal = parseFloat(turnoRow.sub_precio)
-        } else {
-          montoTotal = parseFloat(turnoRow.servicio_precio || 0)
-        }
-        console.log(`  [id=${prestacion.id}] via turno_id=${prestacion.turno_id}: sub_precio=${turnoRow.sub_precio} servicio_precio=${turnoRow.servicio_precio} => $${montoTotal}`)
+      if (turno) {
+        montoTotal = parseFloat(turno.sub_precio || 0) > 0
+          ? parseFloat(turno.sub_precio)
+          : parseFloat(turno.servicio_precio || 0)
+        console.log(`  [id=${p.id}] turno_id=${p.turno_id}: sub=${turno.sub_precio} base=${turno.servicio_precio} => $${montoTotal}`)
       }
     }
 
-    // ── Actualizar ────────────────────────────────────────────────────────
     if (montoTotal > 0) {
       const montoProfesional = parseFloat(((montoTotal * porcentaje) / 100).toFixed(2))
-      try {
-        await db.query(`
-          UPDATE prestaciones
-          SET monto_total = :montoTotal, monto_profesional = :montoProfesional
-          WHERE id = :id
-        `, { replacements: { montoTotal, montoProfesional, id: prestacion.id } })
-        actualizadas++
-        console.log(`  ✅ Actualizada prestacion id=${prestacion.id}: monto_total=$${montoTotal} monto_prof=$${montoProfesional}`)
-      } catch (err) {
-        errores.push({ id: prestacion.id, error: err.message })
-        console.error(`  ❌ Error actualizando id=${prestacion.id}: ${err.message}`)
-      }
+      await db.query(`
+        UPDATE prestaciones
+        SET monto_total = :mt, monto_profesional = :mp, porcentaje_profesional = :pct
+        WHERE id = :id
+      `, { replacements: { mt: montoTotal, mp: montoProfesional, pct: porcentaje, id: p.id } })
+      console.log(`  ✅ id=${p.id}: monto_total=$${montoTotal} monto_prof=$${montoProfesional} (${porcentaje}%)`)
+      f1actualizadas++
     } else {
-      sinPrecio++
-      console.log(`  ⚠️  id=${prestacion.id} sigue en $0 — no se encontró precio`)
+      console.log(`  ⚠️  id=${p.id}: no se encontró precio`)
+      f1sinPrecio++
     }
   }
 
-  console.log("\n═══════════════════════════════════════════════")
-  console.log(`Total revisadas: ${prestaciones.length}`)
-  console.log(`✅ Actualizadas: ${actualizadas}`)
-  console.log(`⚠️  Sin precio disponible: ${sinPrecio}`)
-  if (errores.length > 0) {
-    console.log(`❌ Errores: ${errores.length}`)
-    errores.forEach(e => console.log(`   id=${e.id}: ${e.error}`))
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FASE 2: prestaciones con monto_total > 0 donde la comisión aplicada
+  //         no coincide con el porcentaje_comision actual del profesional
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log("\n╔══════════════════════════════════════════════════════════════╗")
+  console.log("║  FASE 2 – Recalcular comisión en prestaciones ya con precio  ║")
+  console.log("╚══════════════════════════════════════════════════════════════╝\n")
+
+  // Traer todas las prestaciones Pendiente no liquidadas con monto > 0
+  const [fase2] = await db.query(`
+    SELECT p.id, p.profesional_id, p.monto_total, p.monto_profesional, p.porcentaje_profesional,
+           prof.porcentaje_comision
+    FROM prestaciones p
+    JOIN profesionales prof ON prof.id = p.profesional_id
+    WHERE p.monto_total > 0
+      AND p.estado = 'Pendiente'
+      AND p.liquidacion_id IS NULL
+    ORDER BY p.profesional_id, p.id ASC
+  `)
+
+  // Filtrar sólo las que tienen un % aplicado diferente al actual del profesional
+  const aCorregir = fase2.filter(p => {
+    const pctActual  = parseFloat(p.porcentaje_comision) || 50
+    const pctGuardado = parseFloat(p.porcentaje_profesional) || 50
+    // Tolerancia de 0.01 para evitar problemas de punto flotante
+    return Math.abs(pctActual - pctGuardado) > 0.01
+  })
+
+  console.log(`📋 Prestaciones con comisión desactualizada: ${aCorregir.length} (de ${fase2.length} totales)\n`)
+
+  if (aCorregir.length > 0) {
+    // Mostrar resumen agrupado por profesional
+    const porProf = {}
+    for (const p of aCorregir) {
+      const k = p.profesional_id
+      if (!porProf[k]) porProf[k] = { porcentaje_comision: p.porcentaje_comision, count: 0, total: 0 }
+      porProf[k].count++
+      porProf[k].total += parseFloat(p.monto_total)
+    }
+    for (const [profId, info] of Object.entries(porProf)) {
+      console.log(`  Profesional id=${profId}: ${info.count} prestaciones, comisión correcta=${info.porcentaje_comision}%`)
+    }
+    console.log("")
   }
-  console.log("═══════════════════════════════════════════════\n")
+
+  let f2actualizadas = 0
+  for (const p of aCorregir) {
+    const porcentaje = parseFloat(p.porcentaje_comision) || 50
+    const montoTotal = parseFloat(p.monto_total)
+    const montoProfesionalNuevo = parseFloat(((montoTotal * porcentaje) / 100).toFixed(2))
+    const montoProfesionalViejo = parseFloat(p.monto_profesional)
+
+    await db.query(`
+      UPDATE prestaciones
+      SET monto_profesional = :mp, porcentaje_profesional = :pct
+      WHERE id = :id
+    `, { replacements: { mp: montoProfesionalNuevo, pct: porcentaje, id: p.id } })
+
+    console.log(
+      `  ✅ id=${p.id}: monto_total=$${montoTotal}` +
+      ` ${parseFloat(p.porcentaje_profesional)}%→${porcentaje}%` +
+      ` monto_prof: $${montoProfesionalViejo}→$${montoProfesionalNuevo}`
+    )
+    f2actualizadas++
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Resumen final
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log("\n═══════════════════════════════════════════════════")
+  console.log("RESUMEN FINAL")
+  console.log(`  Fase 1 (monto=$0) → actualizadas: ${f1actualizadas}  sin precio: ${f1sinPrecio}`)
+  console.log(`  Fase 2 (comisión)  → corregidas:  ${f2actualizadas}`)
+  console.log("═══════════════════════════════════════════════════\n")
 
   await db.close()
 }

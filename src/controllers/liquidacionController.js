@@ -146,9 +146,10 @@ exports.generarLiquidacion = async (req, res) => {
       })
     }
 
-    // Calcular totales
+    // Calcular totales: sumar todo primero, luego aplicar la comisión del profesional UNA VEZ
     const monto_total_servicios = prestaciones.reduce((sum, p) => sum + parseFloat(p.monto_total), 0)
-    let monto_profesional = prestaciones.reduce((sum, p) => sum + parseFloat(p.monto_profesional), 0)
+    const porcentaje_comision = parseFloat(profesional.porcentaje_comision) || 50
+    let monto_profesional = parseFloat(((monto_total_servicios * porcentaje_comision) / 100).toFixed(2))
 
     // Si se proporciona un monto personalizado, usarlo
     if (monto_custom !== undefined && monto_custom !== null) {
@@ -501,33 +502,16 @@ exports.simularLiquidacion = async (req, res) => {
       subQuery: false,
     })
 
-    // ─── DEBUG LOGGING ───────────────────────────────────────────────────────
-    console.log("\n══════════════════════════════════════════════")
-    console.log(`[SIMULAR] profesional_id=${profesional_id} tipo=${tipo} periodo=${periodo}`)
-    console.log(`[SIMULAR] Rango: ${fechaInicio.toISOString().split("T")[0]} → ${fechaFin.toISOString().split("T")[0]}`)
-    console.log(`[SIMULAR] Total prestaciones encontradas: ${prestaciones.length}`)
-    let sumTotal = 0, sumProf = 0
-    prestaciones.forEach((p, i) => {
-      const mt = parseFloat(p.monto_total)
-      const mp = parseFloat(p.monto_profesional)
-      sumTotal += mt
-      sumProf  += mp
-      console.log(
-        `  [${i+1}] id=${p.id} fecha=${p.fecha}` +
-        ` turno_id=${p.turno_id ?? "null"}` +
-        ` tratamiento_id=${p.tratamiento_id ?? "null"}` +
-        ` monto_total=${mt} monto_prof=${mp}` +
-        ` paciente="${p.paciente?.apellido} ${p.paciente?.nombre}"` +
-        ` obs="${(p.observaciones || "").substring(0, 60)}"`
-      )
+    // Traer el profesional para obtener su comisión actual
+    const profesional = await Profesional.findByPk(profesional_id, {
+      attributes: ["id", "porcentaje_comision"],
     })
-    console.log(`[SIMULAR] SUMA monto_total=${sumTotal} monto_profesional=${sumProf}`)
-    console.log("══════════════════════════════════════════════\n")
-    // ─────────────────────────────────────────────────────────────────────────
+    const porcentaje_comision = parseFloat(profesional?.porcentaje_comision) || 50
 
-    // Calcular totales
+    // Calcular totales: sumar el valor completo de todos los tratamientos primero,
+    // luego aplicar la comisión del profesional UNA SOLA VEZ sobre el total
     const monto_total_servicios = prestaciones.reduce((sum, p) => sum + parseFloat(p.monto_total), 0)
-    const monto_profesional = prestaciones.reduce((sum, p) => sum + parseFloat(p.monto_profesional), 0)
+    const monto_profesional = parseFloat(((monto_total_servicios * porcentaje_comision) / 100).toFixed(2))
 
     res.json({
       periodo_inicio: fechaInicio,
@@ -535,6 +519,7 @@ exports.simularLiquidacion = async (req, res) => {
       cantidad_prestaciones: prestaciones.length,
       monto_total_servicios: monto_total_servicios.toFixed(2),
       monto_profesional: monto_profesional.toFixed(2),
+      porcentaje_profesional: porcentaje_comision,
       prestaciones,
     })
   } catch (error) {
