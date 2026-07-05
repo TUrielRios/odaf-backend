@@ -410,7 +410,7 @@ const actualizarTratamiento = async (req, res) => {
         const profesional = await Profesional.findByPk(profesionalId)
         const porcentajeProfesional = profesional?.porcentaje_comision || 50
 
-        const montoTotal = parseFloat(tratamiento.precio_paciente) || 0
+        const montoTotal = (parseFloat(tratamiento.precio_paciente) || 0) + (parseFloat(tratamiento.cobertura_obra_social) || 0)
         const montoProfesional = (montoTotal * porcentajeProfesional) / 100
 
         await Prestacion.create({

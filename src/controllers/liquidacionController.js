@@ -1,4 +1,4 @@
-const { Liquidacion, Prestacion, Profesional, Paciente, Servicio } = require("../models")
+const { Liquidacion, Prestacion, Profesional, Paciente, Servicio, ObraSocial } = require("../models")
 const { validationResult } = require("express-validator")
 const { Op } = require("sequelize")
 
@@ -75,6 +75,14 @@ exports.obtenerLiquidacionPorId = async (req, res) => {
               model: Paciente,
               as: "paciente",
               attributes: ["id", "nombre", "apellido"],
+              include: [
+                {
+                  model: ObraSocial,
+                  as: "obraSocial",
+                  attributes: ["id", "nombre"],
+                  required: false,
+                },
+              ],
             },
             {
               model: Servicio,
@@ -436,6 +444,7 @@ exports.simularLiquidacion = async (req, res) => {
     const prestaciones = await Prestacion.findAll({
       where,
       include,
+      subQuery: false,
     })
 
     // Calcular totales
