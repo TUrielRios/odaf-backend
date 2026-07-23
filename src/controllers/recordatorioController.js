@@ -191,10 +191,19 @@ const previewRecordatorio = async (req, res) => {
   }
 }
 
+// Cada canal de recordatorio guarda su propio template por defecto en ConfiguracionSistema.
+const CLAVES_TEMPLATE = {
+  email: "recordatorio_email_template",
+  whatsapp: "recordatorio_whatsapp_template",
+}
+
+const resolverCanal = (valor) => (valor === "whatsapp" ? "whatsapp" : "email")
+
 const obtenerTemplate = async (req, res) => {
   try {
+    const canal = resolverCanal(req.query.canal)
     const config = await ConfiguracionSistema.findOne({
-      where: { clave: "recordatorio_email_template" },
+      where: { clave: CLAVES_TEMPLATE[canal] },
     })
     res.json({ template: config ? config.valor : "" })
   } catch (error) {
@@ -206,15 +215,20 @@ const obtenerTemplate = async (req, res) => {
 const guardarTemplate = async (req, res) => {
   try {
     const { template } = req.body
+    const canal = resolverCanal(req.body.canal)
+    const clave = CLAVES_TEMPLATE[canal]
 
     const [config, created] = await ConfiguracionSistema.findOrCreate({
-      where: { clave: "recordatorio_email_template" },
+      where: { clave },
       defaults: {
-        clave: "recordatorio_email_template",
+        clave,
         valor: template || "",
         tipo: "string",
-        descripcion: "Template personalizado para el email de recordatorio de turno",
-        categoria: "email",
+        descripcion:
+          canal === "whatsapp"
+            ? "Template personalizado para el recordatorio de turno por WhatsApp"
+            : "Template personalizado para el email de recordatorio de turno",
+        categoria: "recordatorios",
       },
     })
 
