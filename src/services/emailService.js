@@ -1,16 +1,48 @@
-const nodemailer = require("nodemailer")
-
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: false,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-})
-
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173"
+
+const BREVO_API_KEY = process.env.BREVO_API_KEY
+const EMAIL_FROM = process.env.EMAIL_FROM || process.env.EMAIL_USER
+const EMAIL_FROM_NAME = process.env.EMAIL_FROM_NAME || "ODAF Odontologia"
+
+// Envío vía API HTTP de Brevo (por HTTPS/443). NO se usa SMTP a propósito:
+// Railway bloquea los puertos SMTP salientes (25/465/587), lo que causaba
+// los "Connection timeout". Las plantillas HTML no cambian, solo el transporte.
+const enviarEmail = async ({ to, subject, html }) => {
+  if (!BREVO_API_KEY) {
+    throw new Error("BREVO_API_KEY no está configurada")
+  }
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15000)
+
+  try {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        "api-key": BREVO_API_KEY,
+      },
+      body: JSON.stringify({
+        sender: { name: EMAIL_FROM_NAME, email: EMAIL_FROM },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
+      signal: controller.signal,
+    })
+
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      throw new Error(`Brevo API ${response.status}: ${data.message || "error desconocido"}`)
+    }
+
+    return data.messageId
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
 
 const formatearFecha = (fecha) => {
   if (!fecha) return ""
@@ -52,7 +84,6 @@ const enviarConfirmacionTurno = async (turnoData, pacienteEmail) => {
     const { paciente, profesional, servicio, fecha, hora_inicio, hora_fin, turnoId } = turnoData
 
     const mailOptions = {
-      from: `"ODAF Odontologia" <${process.env.EMAIL_USER}>`,
       to: pacienteEmail,
       subject: "Confirmacion de Turno - ODAF",
       html: `
@@ -98,9 +129,9 @@ const enviarConfirmacionTurno = async (turnoData, pacienteEmail) => {
       `,
     }
 
-    const info = await transporter.sendMail(mailOptions)
-    console.log("Email de confirmacion enviado:", info.messageId)
-    return { success: true, messageId: info.messageId }
+    const messageId = await enviarEmail(mailOptions)
+    console.log("Email de confirmacion enviado:", messageId)
+    return { success: true, messageId }
   } catch (error) {
     console.error("Error al enviar email de confirmacion:", error)
     return { success: false, error: error.message }
@@ -112,7 +143,6 @@ const enviarTurnoPendiente = async (turnoData, pacienteEmail) => {
     const { paciente, profesional, servicio, fecha, hora_inicio, hora_fin } = turnoData
 
     const mailOptions = {
-      from: `"ODAF Odontologia" <${process.env.EMAIL_USER}>`,
       to: pacienteEmail,
       subject: "Turno Recibido (Pendiente de Aprobación) - ODAF",
       html: `
@@ -149,9 +179,9 @@ const enviarTurnoPendiente = async (turnoData, pacienteEmail) => {
       `,
     }
 
-    const info = await transporter.sendMail(mailOptions)
-    console.log("Email de turno pendiente enviado:", info.messageId)
-    return { success: true, messageId: info.messageId }
+    const messageId = await enviarEmail(mailOptions)
+    console.log("Email de turno pendiente enviado:", messageId)
+    return { success: true, messageId }
   } catch (error) {
     console.error("Error al enviar email de turno pendiente:", error)
     return { success: false, error: error.message }
@@ -163,7 +193,6 @@ const enviarCancelacionTurno = async (turnoData, pacienteEmail) => {
     const { paciente, profesional, servicio, fecha, hora_inicio } = turnoData
 
     const mailOptions = {
-      from: `"ODAF Odontologia" <${process.env.EMAIL_USER}>`,
       to: pacienteEmail,
       subject: "Turno Cancelado - ODAF",
       html: `
@@ -203,9 +232,9 @@ const enviarCancelacionTurno = async (turnoData, pacienteEmail) => {
       `,
     }
 
-    const info = await transporter.sendMail(mailOptions)
-    console.log("Email de cancelacion enviado:", info.messageId)
-    return { success: true, messageId: info.messageId }
+    const messageId = await enviarEmail(mailOptions)
+    console.log("Email de cancelacion enviado:", messageId)
+    return { success: true, messageId }
   } catch (error) {
     console.error("Error al enviar email de cancelacion:", error)
     return { success: false, error: error.message }
@@ -217,7 +246,6 @@ const enviarReprogramacionTurno = async (turnoData, pacienteEmail, fechaAnterior
     const { paciente, profesional, servicio, fecha, hora_inicio, hora_fin, turnoId } = turnoData
 
     const mailOptions = {
-      from: `"ODAF Odontologia" <${process.env.EMAIL_USER}>`,
       to: pacienteEmail,
       subject: "Turno Reprogramado - ODAF",
       html: `
@@ -260,9 +288,9 @@ const enviarReprogramacionTurno = async (turnoData, pacienteEmail, fechaAnterior
       `,
     }
 
-    const info = await transporter.sendMail(mailOptions)
-    console.log("Email de reprogramacion enviado:", info.messageId)
-    return { success: true, messageId: info.messageId }
+    const messageId = await enviarEmail(mailOptions)
+    console.log("Email de reprogramacion enviado:", messageId)
+    return { success: true, messageId }
   } catch (error) {
     console.error("Error al enviar email de reprogramacion:", error)
     return { success: false, error: error.message }
@@ -287,7 +315,6 @@ const enviarRecordatorioTurno = async (turnoData, pacienteEmail, customTemplate 
     }
 
     const mailOptions = {
-      from: `"ODAF Odontologia" <${process.env.EMAIL_USER}>`,
       to: pacienteEmail,
       subject: "Recordatorio de Turno - ODAF",
       html: `
@@ -339,9 +366,9 @@ const enviarRecordatorioTurno = async (turnoData, pacienteEmail, customTemplate 
       `,
     }
 
-    const info = await transporter.sendMail(mailOptions)
-    console.log("Email de recordatorio enviado:", info.messageId)
-    return { success: true, messageId: info.messageId }
+    const messageId = await enviarEmail(mailOptions)
+    console.log("Email de recordatorio enviado:", messageId)
+    return { success: true, messageId }
   } catch (error) {
     console.error("Error al enviar email de recordatorio:", error)
     return { success: false, error: error.message }

@@ -10,19 +10,19 @@ const testEmailSending = async () => {
     console.log('🧪 Iniciando prueba de envío de email...\n');
 
     // Verificar variables de entorno
-    console.log('📋 Configuración de email:');
-    console.log(`   EMAIL_HOST: ${process.env.EMAIL_HOST}`);
-    console.log(`   EMAIL_PORT: ${process.env.EMAIL_PORT}`);
-    console.log(`   EMAIL_USER: ${process.env.EMAIL_USER}`);
-    console.log(`   EMAIL_PASS: ${process.env.EMAIL_PASS ? '***configurada***' : '❌ NO CONFIGURADA'}\n`);
+    console.log('📋 Configuración de email (Brevo):');
+    console.log(`   BREVO_API_KEY: ${process.env.BREVO_API_KEY ? '***configurada***' : '❌ NO CONFIGURADA'}`);
+    console.log(`   EMAIL_FROM: ${process.env.EMAIL_FROM || process.env.EMAIL_USER}`);
+    console.log(`   EMAIL_FROM_NAME: ${process.env.EMAIL_FROM_NAME || 'ODAF Odontologia'}\n`);
 
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-        console.error('❌ Error: Las credenciales de email no están configuradas en el archivo .env');
+    const emailDestino = process.env.EMAIL_FROM || process.env.EMAIL_USER;
+
+    if (!process.env.BREVO_API_KEY || !emailDestino) {
+        console.error('❌ Error: La configuración de Brevo no está completa en el archivo .env');
         console.log('\n💡 Asegúrate de configurar:');
-        console.log('   - EMAIL_HOST');
-        console.log('   - EMAIL_PORT');
-        console.log('   - EMAIL_USER');
-        console.log('   - EMAIL_PASS');
+        console.log('   - BREVO_API_KEY');
+        console.log('   - EMAIL_FROM (remitente verificado en Brevo)');
+        console.log('   - EMAIL_FROM_NAME (opcional)');
         process.exit(1);
     }
 
@@ -46,10 +46,10 @@ const testEmailSending = async () => {
     };
 
     console.log('📧 Intentando enviar email de prueba...');
-    console.log(`   Destinatario: ${process.env.EMAIL_USER}\n`);
+    console.log(`   Destinatario: ${emailDestino}\n`);
 
     try {
-        const result = await enviarConfirmacionTurno(turnoDataPrueba, process.env.EMAIL_USER);
+        const result = await enviarConfirmacionTurno(turnoDataPrueba, emailDestino);
 
         if (result.success) {
             console.log('✅ ¡Email enviado exitosamente!');
@@ -62,15 +62,12 @@ const testEmailSending = async () => {
     } catch (error) {
         console.error('❌ Error inesperado:', error.message);
         console.error('\n🔍 Posibles causas:');
-        console.error('   1. Credenciales incorrectas');
-        console.error('   2. Gmail bloqueando "aplicaciones menos seguras"');
-        console.error('   3. Necesitas crear una "contraseña de aplicación" en Gmail');
-        console.error('   4. Problemas de conectividad de red');
-        console.error('\n💡 Para Gmail:');
-        console.error('   - Ve a tu cuenta de Google');
-        console.error('   - Seguridad > Verificación en dos pasos (actívala)');
-        console.error('   - Seguridad > Contraseñas de aplicaciones');
-        console.error('   - Genera una contraseña para "Correo" y úsala en EMAIL_PASS');
+        console.error('   1. BREVO_API_KEY incorrecta o revocada');
+        console.error('   2. El remitente (EMAIL_FROM) no está verificado en Brevo');
+        console.error('   3. Cuenta de Brevo no activada o límite diario alcanzado');
+        console.error('\n💡 Para Brevo:');
+        console.error('   - Verifica el remitente en Senders, Domains & Dedicated IPs > Senders');
+        console.error('   - Genera/revisa la API key en Settings > SMTP & API > API Keys');
     }
 };
 
